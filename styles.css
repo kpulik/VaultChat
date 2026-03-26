@@ -1,6 +1,24 @@
 /* VaultChat - terminal-meets-notebook aesthetic */
 /* OKLCH palette, no Inter/Roboto/Arial, no purple gradients */
 
+/* ── Utility classes ───────────────────────────────────────────────────── */
+
+.cs-hidden {
+  display: none !important;
+}
+
+.cs-accent-active {
+  color: var(--cs-accent) !important;
+}
+
+.cs-settings-model-input {
+  width: 160px;
+}
+
+.cs-settings-textarea {
+  width: 100%;
+}
+
 .cs-root {
   --cs-accent:      oklch(75% 0.18 65);    /* warm amber */
   --cs-accent-dim:  oklch(60% 0.14 65);

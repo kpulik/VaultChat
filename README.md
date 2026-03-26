@@ -32,14 +32,15 @@ Multi-provider AI chat inside Obsidian with file reading, editing, creation, and
 
 ## Installation
 
-This plugin is not yet listed in the Obsidian community plugin registry. Install manually.
+**From Obsidian (recommended)**
 
-**Requirements**
-
-- Node.js v18+
-- Obsidian 1.0+
+1. Open **Settings > Community Plugins**
+2. Click **Browse** and search for **Chatsidian**
+3. Click **Install**, then **Enable**
 
 **Build from source**
+
+If you prefer to install manually or want to contribute:
 
 ```bash
 git clone https://github.com/kpulik/Chatsidian
@@ -48,20 +49,11 @@ npm install
 npm run build
 ```
 
-**Install into your vault**
+Then copy the built files into your vault:
 
 ```bash
 mkdir -p /path/to/your/vault/.obsidian/plugins/chatsidian
 cp main.js manifest.json styles.css /path/to/your/vault/.obsidian/plugins/chatsidian/
-```
-
-Then add `"chatsidian"` to your vault's `.obsidian/community-plugins.json`:
-
-```json
-[
-  "...other plugins...",
-  "chatsidian"
-]
 ```
 
 Restart Obsidian. The plugin will appear in **Settings > Community Plugins**.

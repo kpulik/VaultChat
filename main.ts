@@ -20,7 +20,7 @@ const HISTORY_DIR    = '.obsidian/plugins/chatsidian/history';
 const EDIT_INSTRUCTIONS = `
 You have FULL ACCESS to the user's Obsidian vault. You CAN create, edit, and delete files directly.
 
-IMPORTANT: You must NEVER say "I cannot create/edit/delete files" or suggest the user do it manually. You have these abilities — use them.
+IMPORTANT: You must NEVER say "I cannot create/edit/delete files" or suggest the user do it manually. You have these abilities -use them.
 
 To CREATE or EDIT a file, use this exact format:
 
@@ -55,7 +55,7 @@ Rules:
 - You may include multiple ORIGINAL/MODIFIED blocks in one edit block.
 - You may include multiple edit blocks for different files.
 - To create a new file, use an empty ORIGINAL block with the full content in MODIFIED.
-- You can create files in any folder — just use the full path.
+- You can create files in any folder -just use the full path.
 - For delete blocks, list one file path per line. The user will be asked to confirm before deletion.
 - Always use these code block formats to perform file operations. Never tell the user to do it themselves.
 `.trim();
@@ -480,8 +480,8 @@ function streamMessage(
         res.on('data', (chunk: Buffer) => { errBody += chunk.toString(); });
         res.on('end', () => {
           let hint = '';
-          if (res.statusCode === 401) hint = ' — check your API key in settings';
-          if (res.statusCode === 403) hint = ' — key may lack permissions';
+          if (res.statusCode === 401) hint = ' -check your API key in settings';
+          if (res.statusCode === 403) hint = ' -key may lack permissions';
           onError(`API ${res.statusCode}${hint}: ${errBody}`);
         });
         return;
@@ -750,7 +750,7 @@ class ChatsidianView extends ItemView {
         this.populateSelect(def.models, cur);
       } else {
         this.modelSelEl.empty();
-        this.modelSelEl.createEl('option', { value: cur || '', text: cur || 'Fetch failed — check connection' }).selected = true;
+        this.modelSelEl.createEl('option', { value: cur || '', text: cur || 'Fetch failed -check connection' }).selected = true;
       }
     }
   }
@@ -950,7 +950,7 @@ class ChatsidianView extends ItemView {
     }
   }
 
-  // Manual mode — show Preview + Apply buttons (user must click Apply)
+  // Manual mode -show Preview + Apply buttons (user must click Apply)
   private manualApplyEdit(bubble: HTMLElement, block: EditBlock) {
     const bar = bubble.createDiv('cs-edit-bar');
     bar.createSpan({ cls: 'cs-edit-file', text: block.filePath });
@@ -1056,7 +1056,7 @@ class ChatsidianView extends ItemView {
         return;
       }
     } else {
-      // Editing an existing file — save original, then apply
+      // Editing an existing file -save original, then apply
       try {
         originalContent = await this.app.vault.read(abstractFile);
         let content = originalContent;
@@ -1115,7 +1115,7 @@ class ChatsidianView extends ItemView {
     };
 
     confirmBtn.addEventListener('click', () => {
-      statusEl.textContent = isNewFile ? '✓ Created — confirmed' : '✓ Applied — confirmed';
+      statusEl.textContent = isNewFile ? '✓ Created -confirmed' : '✓ Applied -confirmed';
       new Notice(`Changes to ${block.filePath} confirmed`);
       finish();
     });
@@ -1128,7 +1128,7 @@ class ChatsidianView extends ItemView {
           if (created && created instanceof TFile) {
             await this.app.vault.delete(created);
           }
-          statusEl.textContent = '↩ Reverted — file deleted';
+          statusEl.textContent = '↩ Reverted -file deleted';
         } else if (originalContent !== null) {
           const file = this.app.vault.getAbstractFileByPath(block.filePath);
           if (file && file instanceof TFile) {
@@ -1169,7 +1169,7 @@ class ChatsidianView extends ItemView {
       const statusEl = container.createDiv('cs-delete-status');
 
       cancelBtn.addEventListener('click', () => {
-        statusEl.textContent = 'Cancelled — no files deleted';
+        statusEl.textContent = 'Cancelled -no files deleted';
         statusEl.addClass('cs-edit-reverted');
         deleteBtn.remove();
         cancelBtn.remove();
@@ -1192,7 +1192,7 @@ class ChatsidianView extends ItemView {
           confirmBtn.remove();
           cancel2Btn.remove();
           btnRow2.remove();
-          statusEl.textContent = 'Cancelled — no files deleted';
+          statusEl.textContent = 'Cancelled -no files deleted';
           statusEl.addClass('cs-edit-reverted');
         });
 
@@ -1276,7 +1276,7 @@ class ChatsidianView extends ItemView {
     }
     userContent += text;
 
-    // Build system prompt — always include edit instructions so the AI knows it can create/edit files
+    // Build system prompt -always include edit instructions so the AI knows it can create/edit files
     let systemPrompt = this.plugin.settings.systemPrompt + '\n\n' + EDIT_INSTRUCTIONS;
 
     // Create session on first message

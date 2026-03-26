@@ -3,7 +3,7 @@
   "name": "Chatsidian",
   "version": "1.0.0",
   "minAppVersion": "1.0.0",
-  "description": "Multi-provider AI chat in Obsidian. Supports Anthropic, OpenAI, Google Gemini, OpenRouter, and Ollama.",
+  "description": "Multi-provider AI chat with file reading, editing, creation, and deletion. Supports Anthropic, OpenAI, Google Gemini, OpenRouter, and Ollama.",
   "author": "Kevin Pulikkottil",
   "authorUrl": "https://github.com/kpulik",
   "isDesktopOnly": true

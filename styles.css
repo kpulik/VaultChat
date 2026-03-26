@@ -289,7 +289,222 @@
   transform: none;
 }
 
+.cs-stop-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  border: none;
+  background: oklch(45% 0.18 25);  /* dark red */
+  color: oklch(95% 0.01 25);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background 130ms, transform 100ms;
+}
+.cs-stop-btn:hover {
+  background: oklch(55% 0.2 25);
+  transform: scale(1.06);
+}
+
+/* ── Provider / Model selectors ─────────────────────────────────────────── */
+
+.cs-provider-select {
+  font-size: 11px;
+  background: var(--background-modifier-form-field);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 4px;
+  color: var(--text-muted);
+  padding: 3px 6px;
+  cursor: pointer;
+  max-width: 130px;
+}
+
+.cs-model-wrap {
+  display: flex;
+  align-items: center;
+}
+
+.cs-model-input {
+  font-size: 11px;
+  background: var(--background-modifier-form-field);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 4px;
+  color: var(--text-muted);
+  padding: 3px 6px;
+  max-width: 130px;
+  outline: none;
+  transition: border-color 150ms;
+}
+.cs-model-input:focus {
+  border-color: var(--cs-accent-dim);
+}
+
+/* ── Body wrapper ────────────────────────────────────────────────────────── */
+
+.cs-body {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.cs-body .cs-messages {
+  flex: 1;
+}
+
+/* ── History panel ───────────────────────────────────────────────────────── */
+
+.cs-history-panel {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px 10px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.cs-new-chat-btn {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 7px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--cs-accent-dim);
+  background: transparent;
+  color: var(--cs-accent);
+  cursor: pointer;
+  margin-bottom: 10px;
+  transition: background 120ms;
+  text-align: left;
+}
+.cs-new-chat-btn:hover {
+  background: var(--background-modifier-hover);
+}
+
+.cs-history-empty {
+  font-size: 13px;
+  color: var(--text-faint);
+  text-align: center;
+  padding: 40px 0;
+}
+
+.cs-history-group-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  padding: 10px 6px 4px;
+}
+
+.cs-session-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 7px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 100ms;
+  position: relative;
+}
+.cs-session-item:hover {
+  background: var(--background-modifier-hover);
+}
+.cs-session-item--active {
+  background: var(--background-modifier-hover);
+  border-left: 2px solid var(--cs-accent);
+  padding-left: 6px;
+}
+
+.cs-session-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.cs-session-title {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-normal);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.4;
+}
+
+.cs-session-meta {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin-top: 2px;
+  font-size: 10px;
+  color: var(--text-faint);
+}
+
+.cs-session-provider {
+  background: var(--background-modifier-form-field);
+  border-radius: 3px;
+  padding: 0 4px;
+  font-size: 9px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.cs-session-files {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  margin-top: 4px;
+}
+
+.cs-file-badge {
+  font-size: 10px;
+  background: var(--background-modifier-form-field);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 3px;
+  padding: 1px 5px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cs-session-delete {
+  flex-shrink: 0;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--text-faint);
+  font-size: 16px;
+  line-height: 1;
+  padding: 0 2px;
+  opacity: 0;
+  transition: opacity 100ms, color 100ms;
+  align-self: center;
+}
+.cs-session-item:hover .cs-session-delete {
+  opacity: 1;
+}
+.cs-session-delete:hover {
+  color: var(--text-error);
+}
+
 /* ── Settings Page ───────────────────────────────────────────────────────── */
+
+.cs-settings-heading {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--cs-accent);
+  margin: 20px 0 6px;
+  border-bottom: 1px solid var(--background-modifier-border);
+  padding-bottom: 4px;
+}
 
 .cs-settings-note {
   font-size: 12px;
@@ -298,17 +513,288 @@
   line-height: 1.5;
 }
 
-.cs-token-summary {
-  cursor: pointer;
-  font-size: 12px;
+.cs-token-display {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 11px;
   color: var(--text-muted);
-  margin-top: 20px;
-  margin-bottom: 6px;
+  background: var(--background-modifier-form-field);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 4px;
+  padding: 5px 10px;
+  margin-bottom: 8px;
+  word-break: break-all;
+  user-select: all;
 }
 
-.cs-token-instructions {
-  font-size: 12px;
+.cs-token-btn-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.cs-tok-btn {
+  font-size: 11px;
+  padding: 3px 10px;
+  border-radius: 4px;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-secondary);
   color: var(--text-muted);
-  line-height: 1.8;
-  padding-left: 20px;
+  cursor: pointer;
+  transition: color 120ms, border-color 120ms;
+}
+.cs-tok-btn:hover {
+  color: var(--text-normal);
+  border-color: var(--text-muted);
+}
+.cs-tok-btn--danger:hover {
+  color: var(--text-error);
+  border-color: var(--text-error);
+}
+
+/* ── File picker / context chips ────────────────────────────────────────── */
+
+.cs-add-file-btn {
+  font-size: 14px;
+  font-weight: 700;
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  border: 1px dashed var(--background-modifier-border);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: color 120ms, border-color 120ms, background 120ms;
+}
+.cs-add-file-btn:hover {
+  color: var(--cs-accent);
+  border-color: var(--cs-accent-dim);
+  background: var(--background-modifier-hover);
+}
+
+.cs-ctx-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  min-height: 0;
+}
+.cs-ctx-chips:empty {
+  display: none;
+}
+
+.cs-ctx-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  background: var(--background-modifier-form-field);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 4px;
+  padding: 2px 6px 2px 8px;
+  color: var(--text-muted);
+  max-width: 200px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  animation: cs-fadein 120ms ease;
+}
+
+.cs-chip-remove {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--text-faint);
+  font-size: 13px;
+  line-height: 1;
+  padding: 0 2px;
+  flex-shrink: 0;
+  transition: color 100ms;
+}
+.cs-chip-remove:hover {
+  color: var(--text-error);
+}
+
+/* ── Edit blocks (diff preview + apply) ─────────────────────────────────── */
+
+.cs-edit-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px 6px 0 0;
+  margin-top: 10px;
+}
+
+.cs-edit-file {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--cs-accent);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cs-apply-btn {
+  font-weight: 600;
+  color: var(--cs-accent) !important;
+  border-color: var(--cs-accent-dim) !important;
+}
+.cs-apply-btn:hover {
+  background: var(--cs-accent) !important;
+  color: var(--cs-accent-text) !important;
+}
+
+.cs-diff-container {
+  border: 1px solid var(--background-modifier-border);
+  border-top: none;
+  border-radius: 0 0 6px 6px;
+  overflow: hidden;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.6;
+  margin-bottom: 8px;
+}
+
+.cs-diff-removed {
+  background: oklch(35% 0.08 25 / 0.3);
+  color: oklch(80% 0.12 25);
+  padding: 3px 12px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.cs-diff-added {
+  background: oklch(35% 0.08 145 / 0.3);
+  color: oklch(80% 0.12 145);
+  padding: 3px 12px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* ── Edit status + confirm/revert ───────────────────────────────────────── */
+
+.cs-edit-status {
+  font-size: 11px;
+  font-weight: 600;
+  margin-left: auto;
+}
+.cs-edit-success {
+  color: oklch(75% 0.15 145);
+}
+.cs-edit-error {
+  color: oklch(75% 0.15 25);
+}
+.cs-edit-reverted {
+  color: var(--text-muted);
+}
+
+.cs-edit-confirm-row {
+  display: flex;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid var(--background-modifier-border);
+  border-top: none;
+  border-radius: 0 0 6px 6px;
+  background: var(--background-secondary);
+}
+
+.cs-confirm-btn {
+  color: oklch(80% 0.12 145) !important;
+  border-color: oklch(50% 0.1 145 / 0.4) !important;
+}
+.cs-confirm-btn:hover {
+  background: oklch(45% 0.12 145) !important;
+  color: #fff !important;
+}
+
+.cs-revert-btn {
+  color: oklch(80% 0.12 25) !important;
+  border-color: oklch(50% 0.1 25 / 0.4) !important;
+}
+.cs-revert-btn:hover {
+  background: oklch(45% 0.12 25) !important;
+  color: #fff !important;
+}
+
+/* ── Delete blocks ──────────────────────────────────────────────────────── */
+
+.cs-delete-block {
+  margin-top: 10px;
+  border: 1px solid oklch(50% 0.12 25 / 0.4);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.cs-delete-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  background: oklch(30% 0.06 25 / 0.5);
+  font-weight: 600;
+  font-size: 13px;
+  color: oklch(85% 0.1 25);
+}
+
+.cs-delete-icon {
+  font-size: 15px;
+}
+
+.cs-delete-list {
+  padding: 6px 12px;
+  background: var(--background-secondary);
+}
+
+.cs-delete-item {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  padding: 3px 0;
+  color: var(--text-normal);
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+.cs-delete-item:last-child {
+  border-bottom: none;
+}
+
+.cs-delete-warning {
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: oklch(85% 0.12 25);
+  background: oklch(30% 0.08 25 / 0.4);
+  text-align: center;
+}
+
+.cs-delete-confirm-final {
+  color: oklch(90% 0.1 25) !important;
+  border-color: oklch(55% 0.14 25) !important;
+  font-weight: 700 !important;
+}
+.cs-delete-confirm-final:hover {
+  background: oklch(45% 0.15 25) !important;
+  color: #fff !important;
+}
+
+.cs-delete-status {
+  padding: 6px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  min-height: 0;
+}
+.cs-delete-status:empty {
+  display: none;
+}
+
+.cs-delete-error {
+  padding: 3px 12px;
+  font-size: 11px;
+  color: oklch(75% 0.12 25);
 }

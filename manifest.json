@@ -1,9 +1,9 @@
 {
-  "id": "claudesidian",
-  "name": "Claudesidian",
+  "id": "chatsidian",
+  "name": "Chatsidian",
   "version": "1.0.0",
   "minAppVersion": "1.0.0",
-  "description": "Claude AI in Obsidian using your Pro/Max subscription OAuth token",
+  "description": "Multi-provider AI chat in Obsidian. Supports Anthropic, OpenAI, Google Gemini, OpenRouter, and Ollama.",
   "author": "Kevin Pulikkottil",
   "authorUrl": "https://github.com/kpulik",
   "isDesktopOnly": true

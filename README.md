@@ -1,61 +1,48 @@
-# Claudesidian
+# Chatsidian
 
-Claude AI inside Obsidian, using your existing Claude Pro/Max subscription via the Claude Code OAuth token. No separate API billing.
+Multi-provider AI chat inside Obsidian with file reading, editing, creation, and deletion. Supports Anthropic (Claude), OpenAI, Google Gemini, OpenRouter, and Ollama.
 
-Built for research and personal productivity, exploring how AI can integrate into a local knowledge management workflow.
-
----
-
-> **Before you use this:** Claudesidian uses the OAuth token issued to Claude Code (Anthropic's official CLI) to call Anthropic's API. This token is scoped for Claude Code only, and using it in other clients is not officially sanctioned by Anthropic. It sits in a grey area of their Terms of Service. Anthropic has previously blocked third-party clients using this token (January 2026), so there is a real chance it stops working at some point, or that your account gets rate-limited. If you want something guaranteed stable, use the [official API](https://console.anthropic.com) with a paid key instead.
+> **API keys:** You need a standard API key from each provider you want to use. Claude Code OAuth tokens (`sk-ant-oat01-...`) do not work — Anthropic blocks them from third-party API calls.
 
 ---
 
-## How it works
+## Features
 
-Claudesidian authenticates with Anthropic's API on behalf of your subscription. Standard API keys (`sk-ant-...`) from console.anthropic.com and Claude Code OAuth tokens are both supported.
+- **Multi-provider** — switch between Anthropic, OpenAI, Gemini, OpenRouter, and Ollama from a single dropdown
+- **File reading** — attach any vault file to the conversation with the **+** button; the AI sees the full contents
+- **File editing** — the AI proposes edits in a diff format; auto-applied with Confirm/Revert, or manual Apply (configurable)
+- **File creation** — ask the AI to create new notes in any folder
+- **File deletion** — the AI can propose file deletions with a double-confirmation safety prompt
+- **Chat history** — persistent sessions stored per-vault, grouped by date, searchable, and resumable
+- **Stop button** — cancel any streaming response mid-generation
+- **Include current note** — one-click toggle to send your active note as context
+- **Streaming** — real-time token streaming from all providers
+- **Dynamic model lists** — Ollama shows installed models; OpenRouter fetches all available models
 
-## Getting your token
+## Providers
 
-You need either a standard API key or a Claude Code OAuth token. Both work.
-
-**Option A: Standard API key** (separate billing, always stable)
-
-Go to [console.anthropic.com](https://console.anthropic.com), create an API key, and paste it in. Starts with `sk-ant-api03-`.
-
-**Option B: Claude Code OAuth token** (uses your Pro/Max subscription)
-
-Requires a Claude Pro or Max plan. Install the Claude Code CLI and run the setup command:
-
-```bash
-npm install -g @anthropic-ai/claude-code
-claude setup-token
-```
-
-Log in with your claude.ai account when the browser opens. The terminal will print a token starting with `sk-ant-oat01-`. Copy and paste that into settings.
-
-If you have already logged into Claude Code before, you can recover your existing token without re-authenticating:
-
-```bash
-security find-generic-password -s 'Claude Code-credentials' -w
-```
-
-Copy the `accessToken` value from the JSON output.
+| Provider      | API key source        | Notes                           |
+| ------------- | --------------------- | ------------------------------- |
+| Anthropic     | console.anthropic.com | Uses `x-api-key` header         |
+| OpenAI        | platform.openai.com   | Bearer token                    |
+| Google Gemini | aistudio.google.com   | OpenAI-compatible endpoint      |
+| OpenRouter    | openrouter.ai         | Access 100+ models with one key |
+| Ollama        | No key needed         | Runs locally; set your base URL |
 
 ## Installation
 
-This plugin is not listed in the Obsidian community plugin registry. Install it manually.
+This plugin is not yet listed in the Obsidian community plugin registry. Install manually.
 
 **Requirements**
 
-- [Node.js](https://nodejs.org) v18+
+- Node.js v18+
 - Obsidian 1.0+
-- A Claude Pro or Max subscription
 
 **Build from source**
 
 ```bash
-git clone https://github.com/kpulik/claudesidian
-cd claudesidian
+git clone https://github.com/kpulik/chatsidian
+cd chatsidian
 npm install
 npm run build
 ```
@@ -63,29 +50,76 @@ npm run build
 **Install into your vault**
 
 ```bash
-mkdir -p /path/to/your/vault/.obsidian/plugins/claudesidian
-cp main.js manifest.json styles.css /path/to/your/vault/.obsidian/plugins/claudesidian/
+mkdir -p /path/to/your/vault/.obsidian/plugins/chatsidian
+cp main.js manifest.json styles.css /path/to/your/vault/.obsidian/plugins/chatsidian/
 ```
 
-Then add `"claudesidian"` to your vault's `.obsidian/community-plugins.json`:
+Then add `"chatsidian"` to your vault's `.obsidian/community-plugins.json`:
 
 ```json
 [
   "...other plugins...",
-  "claudesidian"
+  "chatsidian"
 ]
 ```
 
 Restart Obsidian. The plugin will appear in **Settings > Community Plugins**.
 
+## Ollama setup
+
+Ollama lets you run models locally — no API key, no cost, no data leaving your machine.
+
+**1. Install Ollama**
+
+Download from [ollama.com](https://ollama.com) and run the installer. On Mac it runs as a menu bar app that starts automatically.
+
+**2. Pull a model**
+
+Open Terminal and run one of these:
+
+```bash
+ollama pull llama3.2        # 2GB, good general purpose
+ollama pull llama3.2:1b     # 1GB, fastest/smallest
+ollama pull mistral         # 4GB, strong reasoning
+ollama pull codellama       # 4GB, code-focused
+ollama pull gemma3          # 5GB, Google's open model
+ollama pull qwen2.5         # 4GB, strong at multilingual
+```
+
+To see what you have installed: `ollama list`
+
+**3. Open Chatsidian**
+
+Select **Ollama** from the provider dropdown. The model list will auto-populate from your installed models. The base URL defaults to `http://localhost:11434` — only change it if you're running Ollama on a different machine.
+
+**Note:** Ollama must be running for the model list to load. If the dropdown shows "Fetch failed", open the Ollama app or run `ollama serve` in Terminal, then hit the refresh button.
+
+---
+
 ## Usage
 
 - Click the **bot icon** in the left ribbon to open the chat panel
-- Select your model (Haiku / Sonnet / Opus) from the dropdown
-- Check **Include current note** to send your active note as context
-- Use **Cmd+Enter** to send a message
+- Select your **provider** and **model** from the dropdowns in the header
+- Use the **+** button to attach vault files as context — the AI reads their full contents
+- Check **Include current note** to also send your active note
+- Press **Enter** to send, **Cmd+Enter** for a new line
+- Click **Stop** to cancel a streaming response at any time
 - Hover over any assistant message to see **Copy** and **Insert** buttons
-- **Insert** puts the response at your cursor, or appends to the note if no editor is active
+- When the AI proposes file edits, you'll see a diff with **Confirm/Revert** (auto-apply mode) or **Preview/Apply** (manual mode)
+- File deletions always require a **double confirmation** before anything is removed
+- Click the **clock icon** to open chat history — sessions are grouped by date and show attached files
+
+## Settings
+
+Go to **Settings > Chatsidian** to configure:
+
+- **API keys** for each provider (stored locally, obfuscated after entry)
+- **Default model** per provider
+- **Custom base URL** per provider (for proxies or self-hosted endpoints)
+- **Context window (num_ctx)** for Ollama — controls RAM usage (default 4096 tokens)
+- **System prompt** — customize the AI's behavior
+- **Max tokens** — maximum response length
+- **Auto-apply edits** — toggle between auto-apply (with Confirm/Revert) and manual Apply mode
 
 ## Development
 
@@ -96,7 +130,7 @@ npm run dev   # watch mode, rebuilds on every save
 For live reloading inside Obsidian, install the [Hot Reload](https://github.com/pjeby/hot-reload) community plugin and symlink the project folder into your vault's plugins directory:
 
 ```bash
-ln -s /path/to/claudesidian /path/to/vault/.obsidian/plugins/claudesidian
+ln -s /path/to/chatsidian /path/to/vault/.obsidian/plugins/chatsidian
 ```
 
 Open Obsidian's developer tools with **Cmd+Option+I** to debug.

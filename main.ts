@@ -17,6 +17,7 @@ import {
 import {
   apiBasePath,
   applyEdit,
+  neutralizeExecutableFences,
   parseDeleteBlocks as parseDeleteBlocksCore,
   parseEditBlocks as parseEditBlocksCore,
   resolveHost,
@@ -884,7 +885,7 @@ class vaultchatView extends ItemView {
         const comp = new Component();
         comp.load();
         this.renderComponents.push(comp);
-        void MarkdownRenderer.render(this.app, msg.content, bodyEl, '', comp);
+        void MarkdownRenderer.render(this.app, neutralizeExecutableFences(msg.content), bodyEl, '', comp);
         this.addMessageActions(bubble, msg.content);
       }
     }
@@ -1445,7 +1446,7 @@ class vaultchatView extends ItemView {
         streamComp = new Component();
         streamComp.load();
         this.renderComponents.push(streamComp);
-        void MarkdownRenderer.render(this.app, acc, bodyEl, '', streamComp);
+        void MarkdownRenderer.render(this.app, neutralizeExecutableFences(acc), bodyEl, '', streamComp);
         this.messagesEl.scrollTop = this.messagesEl.scrollHeight;
       },
       () => {

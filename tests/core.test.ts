@@ -4,6 +4,7 @@ import {
   apiBasePath,
   applyEdit,
   countOccurrences,
+  neutralizeExecutableFences,
   resolveHost,
   isSafeVaultPath,
   parseEditBlocks,
@@ -164,4 +165,37 @@ test('countOccurrences does not overlap or loop forever', () => {
   assert.equal(countOccurrences('aaaa', 'aa'), 2);
   assert.equal(countOccurrences('abc', 'x'), 0);
   assert.equal(countOccurrences('abc', ''), 0);
+});
+
+test('neutralizeExecutableFences defuses fences that plugins execute', () => {
+  // A dataviewjs fence runs JS with access to `app`, and therefore to
+  // vault.modify/create/delete, bypassing every confirmation in the plugin.
+  const attack = 'text\n```dataviewjs\napp.vault.delete(app.vault.getFiles()[0])\n```\nmore';
+  const out = neutralizeExecutableFences(attack);
+  assert.ok(!out.includes('```dataviewjs'), 'dataviewjs must not survive');
+  assert.ok(out.includes('```text'), 'fence is rewritten, not removed');
+  // The body is still readable by the user.
+  assert.ok(out.includes('app.vault.delete'));
+});
+
+test('neutralizeExecutableFences covers the other known executors', () => {
+  for (const lang of ['dataview', 'js-engine', 'templater-js', 'customjs', 'meta-bind-js', 'quickadd', 'run-python', 'RUN-JS', 'DataviewJS']) {
+    const out = neutralizeExecutableFences('```' + lang + '\nx\n```');
+    assert.ok(out.startsWith('```text'), `${lang} must be neutralised, got ${out.split('\n')[0]}`);
+  }
+});
+
+test('neutralizeExecutableFences leaves ordinary code blocks alone', () => {
+  for (const lang of ['js', 'ts', 'python', 'bash', 'json', 'md', '']) {
+    const src = '```' + lang + '\nx\n```';
+    assert.equal(neutralizeExecutableFences(src), src, `${lang || '(none)'} must be untouched`);
+  }
+  // Closing fences carry no info string and must not be rewritten.
+  assert.equal(neutralizeExecutableFences('```\nplain\n```'), '```\nplain\n```');
+});
+
+test('neutralizeExecutableFences handles tildes, indentation and long fences', () => {
+  assert.ok(neutralizeExecutableFences('~~~dataviewjs\nx\n~~~').startsWith('~~~text'));
+  assert.ok(neutralizeExecutableFences('  ```dataviewjs\nx\n  ```').includes('  ```text'));
+  assert.ok(neutralizeExecutableFences('````dataviewjs\nx\n````').startsWith('````text'));
 });

@@ -23,6 +23,9 @@ Hosted providers are supported too and are entirely optional: Anthropic (Claude)
 - **File reading** - attach any vault file to the conversation with the **+** button; the AI sees the full contents
 - **File editing** - the AI proposes edits in a diff format; review each one with Preview/Apply, or turn on auto-apply (with Confirm/Revert) from the chat footer or settings
 - **Path safety** - edit and delete blocks that point outside the vault are refused
+- **Ambiguous edits refused** - if the text to replace appears more than once, nothing is written
+- **No executable code from the model** - Obsidian runs code-block processors registered by other plugins, so a `dataviewjs` fence would execute JavaScript with vault access. Fences that known executors claim are rewritten before rendering; the code stays readable, it just cannot run
+- **API keys in Obsidian secret storage** - moved out of the plugin's `data.json`, with existing keys migrated automatically
 - **File creation** - ask the AI to create new notes in any folder
 - **File deletion** - the AI can propose file deletions with a double-confirmation safety prompt
 - **Vault awareness** - the AI sees your full file tree so it uses correct paths

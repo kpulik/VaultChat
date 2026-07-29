@@ -104,6 +104,45 @@ export function applyEdit(content: string, original: string, replacement: string
   return { status: 'applied', content: content.replace(original, () => replacement) };
 }
 
+// Obsidian's MarkdownRenderer runs every code-block post-processor a plugin has
+// registered. Several popular plugins register ones that EXECUTE the block: a
+// ```dataviewjs fence runs JavaScript with access to `app`, and therefore to
+// vault.modify, vault.create and vault.delete. Assistant output is model-authored
+// and note contents are fed back into the prompt, so a poisoned note could reach
+// code execution and bypass every confirmation in this plugin. Rewriting the
+// language of those fences before rendering leaves the text fully readable while
+// making sure nothing claims it for execution.
+//
+// This is a denylist, so it cannot be complete. It covers the executors that are
+// widely installed; anything unknown still renders as an ordinary code block.
+const EXECUTABLE_FENCE_LANGS = new Set([
+  'dataviewjs', 'dataview',
+  'js-engine', 'jsengine',
+  'templater-js', 'templater',
+  'customjs',
+  'meta-bind-js', 'meta-bind-button', 'meta-bind-embed',
+  'quickadd',
+  'pyscript',
+  'jsx', 'tsx',
+]);
+
+export function isExecutableFenceLang(lang: string): boolean {
+  const l = lang.trim().toLowerCase();
+  // The Execute Code plugin registers run-<language> for a long list.
+  return EXECUTABLE_FENCE_LANGS.has(l) || l.startsWith('run-');
+}
+
+export function neutralizeExecutableFences(markdown: string): string {
+  return markdown.replace(
+    /^([ \t]{0,3})(`{3,}|~{3,})([^\n]*)$/gm,
+    (whole: string, indent: string, fence: string, info: string) => {
+      const lang = info.trim().split(/\s+/)[0] ?? '';
+      if (!lang || !isExecutableFenceLang(lang)) return whole;
+      return `${indent}${fence}text`;
+    },
+  );
+}
+
 // Secret ids must be lowercase alphanumeric with optional dashes.
 export function secretId(providerId: string): string {
   return `vaultchat-${providerId}`;

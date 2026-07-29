@@ -1,6 +1,6 @@
 {
   "name": "vaultchat",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "Multi-provider AI chat in Obsidian. Supports Anthropic, OpenAI, Google Gemini, OpenRouter, and Ollama.",
   "main": "main.js",
   "scripts": {

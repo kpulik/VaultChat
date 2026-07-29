@@ -1,7 +1,7 @@
 {
   "id": "vaultchat",
   "name": "VaultChat",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "minAppVersion": "1.7.2",
   "description": "Local-first AI chat that can actually edit your vault. Runs on Ollama, LM Studio, or any OpenAI-compatible server, with optional Anthropic, OpenAI, Gemini and OpenRouter. Reads, edits, creates and deletes notes with confirmation.",
   "author": "Kevin Pulikkottil",

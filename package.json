@@ -5,16 +5,16 @@
   "main": "main.js",
   "scripts": {
     "dev": "node esbuild.config.mjs",
-    "build": "tsc --noEmit --skipLibCheck && node esbuild.config.mjs production"
+    "build": "tsc --noEmit --skipLibCheck && node esbuild.config.mjs production",
+    "lint": "eslint ."
   },
   "devDependencies": {
     "@types/node": "^18",
     "@typescript-eslint/eslint-plugin": "^8.57.2",
     "@typescript-eslint/parser": "^8.57.2",
-    "builtin-modules": "^3.3.0",
     "esbuild": "^0.21.5",
     "eslint": "^9.39.4",
-    "eslint-plugin-obsidianmd": "file:../../../../../private/tmp/eslint-plugin",
+    "eslint-plugin-obsidianmd": "^0.4.1",
     "obsidian": "latest",
     "tslib": "2.6.2",
     "typescript": "^5"

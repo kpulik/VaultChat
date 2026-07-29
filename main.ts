@@ -10,6 +10,7 @@ import {
   Setting,
   TFile,
   WorkspaceLeaf,
+  normalizePath,
   setIcon,
 } from 'obsidian';
 import * as http from 'http';
@@ -62,7 +63,7 @@ Rules:
 - Always use these code block formats to perform file operations. Never tell the user to do it themselves.
 `.trim();
 
-type ProviderID = 'anthropic' | 'openai' | 'gemini' | 'openrouter' | 'ollama';
+type ProviderID = 'anthropic' | 'openai' | 'gemini' | 'openrouter' | 'local';
 type ApiFormat  = 'anthropic' | 'openai';
 
 interface ProviderDef {
@@ -73,6 +74,9 @@ interface ProviderDef {
   models:            { id: string; label: string }[];
   apiKeyLabel:       string | null;
   apiKeyPlaceholder: string;
+  // false means the field is shown but sending works without it, for local
+  // servers that are only sometimes started behind a key.
+  apiKeyRequired:    boolean;
   dynamicModels:     boolean;
   customBaseUrl:     boolean;
 }
@@ -84,18 +88,15 @@ const PROVIDERS: Record<ProviderID, ProviderDef> = {
     defaultBaseUrl: 'https://api.anthropic.com',
     endpoint: '/v1/messages',
     models: [
-      { id: 'claude-sonnet-4-6',          label: 'Claude Sonnet 4.6' },
-      { id: 'claude-opus-4-6',            label: 'Claude Opus 4.6' },
-      { id: 'claude-haiku-4-5-20251001',  label: 'Claude Haiku 4.5' },
-      { id: 'claude-sonnet-4-5-20251001', label: 'Claude Sonnet 4.5' },
-      { id: 'claude-opus-4-5-20251101',   label: 'Claude Opus 4.5' },
-      { id: 'claude-3-5-sonnet-20241022', label: 'Claude 3.5 Sonnet' },
-      { id: 'claude-3-5-haiku-20241022',  label: 'Claude 3.5 Haiku' },
-      { id: 'claude-3-opus-20240229',     label: 'Claude 3 Opus' },
-      { id: 'claude-3-haiku-20240307',    label: 'Claude 3 Haiku' },
+      { id: 'claude-opus-5',   label: 'Claude Opus 5' },
+      { id: 'claude-sonnet-5', label: 'Claude Sonnet 5' },
+      { id: 'claude-fable-5',  label: 'Claude Fable 5' },
+      { id: 'claude-opus-4-8', label: 'Claude Opus 4.8' },
+      { id: 'claude-haiku-4-5', label: 'Claude Haiku 4.5' },
     ],
     apiKeyLabel: 'API key',
     apiKeyPlaceholder: 'sk-ant-api03-...',
+    apiKeyRequired: true,
     dynamicModels: false,
     customBaseUrl: false,
   },
@@ -105,20 +106,13 @@ const PROVIDERS: Record<ProviderID, ProviderDef> = {
     defaultBaseUrl: 'https://api.openai.com',
     endpoint: '/v1/chat/completions',
     models: [
-      { id: 'gpt-4o',        label: 'GPT-4o' },
-      { id: 'gpt-4o-mini',   label: 'GPT-4o mini' },
-      { id: 'gpt-4-turbo',   label: 'GPT-4 Turbo' },
-      { id: 'gpt-4',         label: 'GPT-4' },
-      { id: 'gpt-3.5-turbo', label: 'GPT-3.5 Turbo' },
-      { id: 'o4-mini',       label: 'o4-mini' },
-      { id: 'o3',            label: 'o3' },
-      { id: 'o3-mini',       label: 'o3-mini' },
-      { id: 'o1',            label: 'o1' },
-      { id: 'o1-preview',    label: 'o1-preview' },
-      { id: 'o1-mini',       label: 'o1-mini' },
+      { id: 'gpt-5.6-sol',   label: 'GPT-5.6 Sol' },
+      { id: 'gpt-5.6-terra', label: 'GPT-5.6 Terra' },
+      { id: 'gpt-5.6-luna',  label: 'GPT-5.6 Luna' },
     ],
     apiKeyLabel: 'API key',
     apiKeyPlaceholder: 'sk-...',
+    apiKeyRequired: true,
     dynamicModels: false,
     customBaseUrl: false,
   },
@@ -128,17 +122,15 @@ const PROVIDERS: Record<ProviderID, ProviderDef> = {
     defaultBaseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai',
     endpoint: '/chat/completions',
     models: [
-      { id: 'gemini-2.5-pro-preview-05-06',   label: 'Gemini 2.5 Pro' },
-      { id: 'gemini-2.5-flash-preview-04-17', label: 'Gemini 2.5 Flash' },
-      { id: 'gemini-2.0-flash',               label: 'Gemini 2.0 Flash' },
-      { id: 'gemini-2.0-flash-lite',          label: 'Gemini 2.0 Flash Lite' },
-      { id: 'gemini-2.0-pro-exp',             label: 'Gemini 2.0 Pro (exp)' },
-      { id: 'gemini-1.5-pro',                 label: 'Gemini 1.5 Pro' },
-      { id: 'gemini-1.5-flash',               label: 'Gemini 1.5 Flash' },
-      { id: 'gemini-1.5-flash-8b',            label: 'Gemini 1.5 Flash 8B' },
+      { id: 'gemini-3.6-flash',       label: 'Gemini 3.6 Flash' },
+      { id: 'gemini-3.5-flash',       label: 'Gemini 3.5 Flash' },
+      { id: 'gemini-3.5-flash-lite',  label: 'Gemini 3.5 Flash Lite' },
+      { id: 'gemini-3.1-flash-lite',  label: 'Gemini 3.1 Flash Lite' },
+      { id: 'gemini-3.1-pro-preview', label: 'Gemini 3.1 Pro (preview)' },
     ],
     apiKeyLabel: 'API key',
     apiKeyPlaceholder: 'AIza...',
+    apiKeyRequired: true,
     dynamicModels: false,
     customBaseUrl: false,
   },
@@ -148,36 +140,37 @@ const PROVIDERS: Record<ProviderID, ProviderDef> = {
     defaultBaseUrl: 'https://openrouter.ai/api',
     endpoint: '/v1/chat/completions',
     models: [
-      { id: 'openai/gpt-4o',                          label: 'GPT-4o' },
-      { id: 'openai/gpt-4o-mini',                     label: 'GPT-4o mini' },
-      { id: 'anthropic/claude-sonnet-4-5',            label: 'Claude Sonnet 4.5' },
-      { id: 'anthropic/claude-haiku-4-5',             label: 'Claude Haiku 4.5' },
-      { id: 'google/gemini-2.5-pro-preview',          label: 'Gemini 2.5 Pro' },
-      { id: 'google/gemini-2.0-flash-exp:free',       label: 'Gemini 2.0 Flash (free)' },
-      { id: 'meta-llama/llama-4-maverick',            label: 'Llama 4 Maverick' },
-      { id: 'meta-llama/llama-3.3-70b-instruct:free', label: 'Llama 3.3 70B (free)' },
-      { id: 'deepseek/deepseek-r1:free',              label: 'DeepSeek R1 (free)' },
-      { id: 'deepseek/deepseek-chat-v3-0324:free',    label: 'DeepSeek V3 (free)' },
-      { id: 'mistralai/mistral-7b-instruct:free',     label: 'Mistral 7B (free)' },
-      { id: 'mistralai/mixtral-8x7b-instruct',        label: 'Mixtral 8x7B' },
-      { id: 'x-ai/grok-3-beta',                      label: 'Grok 3' },
-      { id: 'x-ai/grok-3-mini-beta',                 label: 'Grok 3 Mini' },
-      { id: 'cohere/command-r-plus',                  label: 'Cohere Command R+' },
-      { id: 'perplexity/sonar-pro',                   label: 'Perplexity Sonar Pro' },
+      { id: 'openai/gpt-5.6-sol',          label: 'GPT-5.6 Sol' },
+      { id: 'openai/gpt-5.6-terra',        label: 'GPT-5.6 Terra' },
+      { id: 'openai/gpt-5.6-luna',         label: 'GPT-5.6 Luna' },
+      { id: 'anthropic/claude-opus-5',     label: 'Claude Opus 5' },
+      { id: 'anthropic/claude-sonnet-5',   label: 'Claude Sonnet 5' },
+      { id: 'anthropic/claude-fable-5',    label: 'Claude Fable 5' },
+      { id: 'google/gemini-3.6-flash',     label: 'Gemini 3.6 Flash' },
+      { id: 'google/gemini-3.5-flash-lite', label: 'Gemini 3.5 Flash Lite' },
+      { id: 'x-ai/grok-4.5',               label: 'Grok 4.5' },
+      { id: 'qwen/qwen3.7-plus',           label: 'Qwen3.7 Plus' },
+      { id: 'qwen/qwen3.7-flash',          label: 'Qwen3.7 Flash' },
     ],
     apiKeyLabel: 'API key',
     apiKeyPlaceholder: 'sk-or-v1-...',
+    apiKeyRequired: true,
     dynamicModels: true,
     customBaseUrl: false,
   },
-  ollama: {
-    name: 'Ollama',
+  local: {
+    // Any server that speaks the OpenAI chat-completions API: Ollama, LM Studio,
+    // llama.cpp, vLLM, LocalAI, Jan. Models are read from /v1/models.
+    name: 'Local (OpenAI-compatible)',
     format: 'openai',
-    defaultBaseUrl: 'http://localhost:11434',
+    // 127.0.0.1 rather than localhost: Node resolves localhost to ::1 first, and
+    // most local servers bind IPv4 only, which surfaces as ECONNREFUSED.
+    defaultBaseUrl: 'http://127.0.0.1:11434',
     endpoint: '/v1/chat/completions',
     models: [],
-    apiKeyLabel: null,
-    apiKeyPlaceholder: '',
+    apiKeyLabel: 'API key',
+    apiKeyPlaceholder: 'Leave blank if your server does not need one',
+    apiKeyRequired: false,
     dynamicModels: true,
     customBaseUrl: true,
   },
@@ -266,23 +259,33 @@ function maskToken(token: string): string {
   return token.slice(0, 12) + '  ●●●●●●●●●●●●●●●●●●●●  ' + token.slice(-4);
 }
 
+// Paths in edit and delete blocks come from the model, so they are untrusted.
+// Obsidian resolves '..' against the vault root, which would let a response write
+// outside the vault entirely. Anything with a '..' segment is refused.
+function isSafeVaultPath(p: string): boolean {
+  const norm = normalizePath(p);
+  return norm.length > 0 && norm !== '/' && !norm.split('/').includes('..');
+}
+
 function parseEditBlocks(text: string): EditBlock[] {
   const blocks: EditBlock[] = [];
   const blockRegex = /```edit:(.+?)\n([\s\S]*?)```/g;
-  let match;
+  let match: RegExpExecArray | null;
   while ((match = blockRegex.exec(text)) !== null) {
     const filePath = match[1].trim();
     const body = match[2];
     const edits: { original: string; replacement: string }[] = [];
 
-    const editRegex = /<<<<<<< ORIGINAL\n([\s\S]*?)\n=======\n([\s\S]*?)\n>>>>>>> MODIFIED/g;
-    let editMatch;
+    // The newline before the markers is optional so that an empty ORIGINAL (the
+    // documented way to create a new file) and an empty MODIFIED both parse.
+    const editRegex = /<<<<<<< ORIGINAL\n([\s\S]*?)\n?=======\n([\s\S]*?)\n?>>>>>>> MODIFIED/g;
+    let editMatch: RegExpExecArray | null;
     while ((editMatch = editRegex.exec(body)) !== null) {
       edits.push({ original: editMatch[1], replacement: editMatch[2] });
     }
 
-    if (edits.length > 0) {
-      blocks.push({ filePath, edits });
+    if (edits.length > 0 && isSafeVaultPath(filePath)) {
+      blocks.push({ filePath: normalizePath(filePath), edits });
     }
   }
   return blocks;
@@ -291,9 +294,12 @@ function parseEditBlocks(text: string): EditBlock[] {
 function parseDeleteBlocks(text: string): DeleteBlock[] {
   const blocks: DeleteBlock[] = [];
   const regex = /```delete\n([\s\S]*?)```/g;
-  let match;
+  let match: RegExpExecArray | null;
   while ((match = regex.exec(text)) !== null) {
-    const paths = match[1].trim().split('\n').map(l => l.trim()).filter(l => l.length > 0);
+    const paths = match[1].trim().split('\n')
+      .map(l => l.trim())
+      .filter(l => l.length > 0 && isSafeVaultPath(l))
+      .map(l => normalizePath(l));
     if (paths.length > 0) {
       blocks.push({ filePaths: paths });
     }
@@ -301,22 +307,44 @@ function parseDeleteBlocks(text: string): DeleteBlock[] {
   return blocks;
 }
 
-function fetchOllamaModels(baseUrl: string): Promise<{ id: string; label: string }[]> {
+// A base URL is accepted both bare (http://host:port) and with the /v1 suffix
+// that most OpenAI-compatible servers document, so the caller can paste either
+// without ending up requesting /v1/v1/....
+function apiBasePath(url: URL): string {
+  const p = url.pathname.replace(/\/$/, '');
+  return p === '' ? '' : p.replace(/\/v1$/, '');
+}
+
+// Node resolves "localhost" to ::1 first, while most local model servers listen
+// on IPv4 only. Connecting by address turns a confusing ECONNREFUSED ::1 into a
+// working request. Remote providers never hit this branch.
+function resolveHost(hostname: string): string {
+  return hostname === 'localhost' ? '127.0.0.1' : hostname;
+}
+
+// Reads the OpenAI-compatible /v1/models endpoint, which Ollama, LM Studio,
+// llama.cpp, vLLM, LocalAI and Jan all serve.
+function fetchLocalModels(baseUrl: string, apiKey: string): Promise<{ id: string; label: string }[]> {
   return new Promise((resolve, reject) => {
-    const url       = new URL('/api/tags', baseUrl.replace(/\/$/, ''));
+    const trimmed   = baseUrl.replace(/\/$/, '');
+    const url       = new URL(trimmed);
     const isHttps   = url.protocol === 'https:';
     const transport = isHttps ? https : http;
     const port      = url.port ? parseInt(url.port) : (isHttps ? 443 : 80);
+    const basePath  = apiBasePath(url);
+    // Servers started without a key ignore the header; ones started with a key
+    // reject the request without it.
+    const headers   = apiKey ? { Authorization: `Bearer ${apiKey}` } : undefined;
 
     const req = transport.get(
-      { hostname: url.hostname, port, path: '/api/tags' },
+      { hostname: resolveHost(url.hostname), port, path: `${basePath}/v1/models`, headers },
       (res: import('http').IncomingMessage) => {
         let data = '';
         res.on('data', (chunk: Buffer) => { data += chunk.toString(); });
         res.on('end', () => {
           try {
-            const json = JSON.parse(data) as { models?: { name: string }[] };
-            resolve((json.models ?? []).map(m => ({ id: m.name, label: m.name })));
+            const json = JSON.parse(data) as { data?: { id: string }[] };
+            resolve((json.data ?? []).map(m => ({ id: m.id, label: m.id })));
           } catch (e) { reject(e instanceof Error ? e : new Error(String(e))); }
         });
         res.on('error', (err: Error) => reject(err));
@@ -377,22 +405,47 @@ interface vaultchatSettings {
   autoApplyEdits: boolean;
 }
 
+// The 'ollama' provider became the generic 'local' provider. Carry a saved
+// Ollama base URL and model across so existing users keep their setup.
+function migrateOllamaProvider(saved: Partial<vaultchatSettings> | null): void {
+  if (!saved) return;
+  const legacy = saved as unknown as {
+    activeProvider?: string;
+    providers?: Record<string, PerProviderSettings>;
+  };
+  if (legacy.providers?.ollama && !legacy.providers.local) {
+    legacy.providers.local = legacy.providers.ollama;
+    delete legacy.providers.ollama;
+  }
+  if (legacy.activeProvider === 'ollama') {
+    legacy.activeProvider = 'local';
+  }
+}
+
 const DEFAULT_SETTINGS: vaultchatSettings = {
   activeProvider: 'anthropic',
   providers: {
-    anthropic:  { apiKey: '', model: 'claude-sonnet-4-6',  baseUrl: '' },
-    openai:     { apiKey: '', model: 'gpt-4o',             baseUrl: '' },
-    gemini:     { apiKey: '', model: 'gemini-2.0-flash',   baseUrl: '' },
-    openrouter: { apiKey: '', model: 'openai/gpt-4o',      baseUrl: '' },
-    ollama:     { apiKey: '', model: '',                   baseUrl: 'http://localhost:11434' },
+    anthropic:  { apiKey: '', model: 'claude-opus-5',      baseUrl: '' },
+    openai:     { apiKey: '', model: 'gpt-5.6-sol',        baseUrl: '' },
+    gemini:     { apiKey: '', model: 'gemini-3.6-flash',   baseUrl: '' },
+    openrouter: { apiKey: '', model: 'openai/gpt-5.6-sol', baseUrl: '' },
+    local:      { apiKey: '', model: '',                   baseUrl: 'http://localhost:11434' },
   },
   systemPrompt: 'You are a helpful assistant integrated into Obsidian. Be concise and precise.',
   maxTokens: 4096,
   ollamaNumCtx: 4096,
-  autoApplyEdits: true,
+  autoApplyEdits: false,
 };
 
 // ─── API ─────────────────────────────────────────────────────────────────────
+
+interface StreamEvent {
+  type?: string;
+  delta?: { type?: string; text?: string };
+  // Reasoning models stream their chain of thought as reasoning_content and only
+  // the answer as content. Both arrive on the same delta.
+  choices?: { delta?: { content?: string; reasoning_content?: string } }[];
+}
 
 function streamMessage(
   settings: vaultchatSettings,
@@ -401,6 +454,7 @@ function streamMessage(
   onChunk:  (text: string) => void,
   onDone:   () => void,
   onError:  (msg: string) => void,
+  onReasoning: () => void,
 ): () => void {
   const providerID = settings.activeProvider;
   const def        = PROVIDERS[providerID];
@@ -410,9 +464,9 @@ function streamMessage(
   const transport  = isHttps ? https : http;
 
   const urlObj   = new URL(baseUrl);
-  const hostname = urlObj.hostname;
+  const hostname = resolveHost(urlObj.hostname);
   const port     = urlObj.port ? parseInt(urlObj.port) : (isHttps ? 443 : 80);
-  const basePath = urlObj.pathname === '/' ? '' : urlObj.pathname.replace(/\/$/, '');
+  const basePath = apiBasePath(urlObj);
   const path     = basePath + def.endpoint;
 
   let bodyStr: string;
@@ -444,12 +498,15 @@ function streamMessage(
       stream:     true,
       max_tokens: settings.maxTokens,
     };
-    if (providerID === 'ollama') {
+    if (providerID === 'local') {
+      // Ollama-style hint. Servers that don't understand it ignore it.
       body['options'] = { num_ctx: settings.ollamaNumCtx };
     }
     bodyStr = JSON.stringify(body);
     headers = {
-      'Authorization':  `Bearer ${ps.apiKey || 'ollama'}`,
+      // Local servers started without a key ignore this; some still require the
+      // header to be present, so send a placeholder rather than omitting it.
+      'Authorization':  `Bearer ${ps.apiKey || 'no-key'}`,
       'Content-Type':   'application/json',
       'Content-Length': Buffer.byteLength(bodyStr),
     };
@@ -483,14 +540,17 @@ function streamMessage(
         const payload = line.slice(6).trim();
         if (payload === '[DONE]') { finished = true; onDone(); return; }
         try {
-          const evt = JSON.parse(payload);
+          const evt = JSON.parse(payload) as StreamEvent;
           if (def.format === 'anthropic') {
-            if (evt.type === 'content_block_delta' && evt.delta?.type === 'text_delta') {
+            if (evt.type === 'content_block_delta' && evt.delta?.type === 'text_delta' && evt.delta.text) {
               onChunk(evt.delta.text);
             }
           } else {
-            const content = evt.choices?.[0]?.delta?.content;
-            if (content) onChunk(content);
+            const delta = evt.choices?.[0]?.delta;
+            if (delta?.content) onChunk(delta.content);
+            // Chain of thought is not added to the transcript, but it is the only
+            // sign of life during a long think, so report that it is happening.
+            else if (delta?.reasoning_content) onReasoning();
           }
         } catch { /* ignore SSE parse errors */ }
       };
@@ -623,6 +683,19 @@ class vaultchatView extends ItemView {
       attr: { for: 'cs-include-note' },
       cls:  'cs-ctx-label',
     });
+    const autoEl = ctxRow.createEl('input', { type: 'checkbox', cls: 'cs-ctx-check' });
+    autoEl.id = 'cs-auto-apply';
+    autoEl.checked = this.plugin.settings.autoApplyEdits;
+    ctxRow.createEl('label', {
+      text: 'Auto-apply edits',
+      attr: { for: 'cs-auto-apply', title: 'Apply file edits without clicking apply first' },
+      cls:  'cs-ctx-label',
+    });
+    autoEl.addEventListener('change', () => {
+      this.plugin.settings.autoApplyEdits = autoEl.checked;
+      void this.plugin.saveSettings();
+    });
+
     ctxRow.createEl('button', {
       cls: 'cs-add-file-btn', text: '+', attr: { title: 'Add file to context' },
     }).addEventListener('click', () => {
@@ -661,7 +734,7 @@ class vaultchatView extends ItemView {
         void this.send();
         return;
       }
-      requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
         this.inputEl.setCssStyles({ height: 'auto' });
         this.inputEl.setCssStyles({ height: Math.min(this.inputEl.scrollHeight, 180) + 'px' });
       });
@@ -738,9 +811,10 @@ class vaultchatView extends ItemView {
 
     try {
       let models: { id: string; label: string }[];
-      if (id === 'ollama') {
-        const baseUrl = this.plugin.settings.providers.ollama.baseUrl || PROVIDERS.ollama.defaultBaseUrl;
-        models = await fetchOllamaModels(baseUrl);
+      if (id === 'local') {
+        const lps     = this.plugin.settings.providers.local;
+        const baseUrl = lps.baseUrl || PROVIDERS.local.defaultBaseUrl;
+        models = await fetchLocalModels(baseUrl, lps.apiKey);
       } else {
         const apiKey = this.plugin.settings.providers.openrouter.apiKey;
         models = apiKey ? await fetchOpenRouterModels(apiKey) : def.models;
@@ -749,7 +823,7 @@ class vaultchatView extends ItemView {
       if (models.length === 0) {
         this.modelSelEl.disabled = false;
         this.modelSelEl.empty();
-        this.modelSelEl.createEl('option', { value: '', text: id === 'ollama' ? 'No models installed' : 'No models found' });
+        this.modelSelEl.createEl('option', { value: '', text: id === 'local' ? 'No models loaded' : 'No models found' });
         return;
       }
       this.modelSelEl.disabled = false;
@@ -949,7 +1023,7 @@ class vaultchatView extends ItemView {
     copyBtn.addEventListener('click', () => {
       void navigator.clipboard.writeText(content).then(() => {
         copyBtn.textContent = '✓ copied';
-        setTimeout(() => { copyBtn.textContent = 'Copy'; }, 1500);
+        window.setTimeout(() => { copyBtn.textContent = 'Copy'; }, 1500);
       });
     });
 
@@ -1281,7 +1355,7 @@ class vaultchatView extends ItemView {
     const def = PROVIDERS[id];
     const ps  = this.plugin.settings.providers[id];
 
-    if (def.apiKeyLabel !== null && !ps.apiKey) {
+    if (def.apiKeyRequired && !ps.apiKey) {
       new Notice(`vaultchat: Add your ${def.name} API key in Settings`);
       return;
     }
@@ -1351,6 +1425,7 @@ class vaultchatView extends ItemView {
     const bubble = this.messagesEl.createDiv('cs-msg cs-msg--assistant');
     const bodyEl = bubble.createDiv('cs-msg-body');
     let acc = '';
+    let thinkingEl: HTMLElement | null = null;
     let streamComp = new Component();
     streamComp.load();
     this.renderComponents.push(streamComp);
@@ -1361,6 +1436,8 @@ class vaultchatView extends ItemView {
       systemPrompt,
       chunk => {
         acc += chunk;
+        thinkingEl?.remove();
+        thinkingEl = null;
         bodyEl.empty();
         streamComp.unload();
         streamComp = new Component();
@@ -1370,6 +1447,8 @@ class vaultchatView extends ItemView {
         this.messagesEl.scrollTop = this.messagesEl.scrollHeight;
       },
       () => {
+        thinkingEl?.remove();
+        thinkingEl = null;
         this.history.push({ role: 'assistant', content: acc });
         this.cancelStream = null;
         this.streaming = false;
@@ -1380,6 +1459,8 @@ class vaultchatView extends ItemView {
         void this.persistSession();
       },
       err => {
+        thinkingEl?.remove();
+        thinkingEl = null;
         bodyEl.addClass('cs-msg-error');
         bodyEl.textContent = `⚠ ${err}`;
         this.cancelStream = null;
@@ -1387,6 +1468,15 @@ class vaultchatView extends ItemView {
         this.stopBtn.addClass('cs-hidden');
         this.sendBtn.removeClass('cs-hidden');
         this.sendBtn.disabled = false;
+      },
+      () => {
+        // Reasoning tokens are arriving. Show that the model is working rather
+        // than leaving an empty bubble; the chain of thought itself is not shown.
+        if (!thinkingEl && !acc) {
+          thinkingEl = bubble.createDiv('cs-thinking');
+          thinkingEl.textContent = 'Thinking…';
+          this.messagesEl.scrollTop = this.messagesEl.scrollHeight;
+        }
       },
     );
 
@@ -1397,7 +1487,7 @@ class vaultchatView extends ItemView {
     const editor = this.app.workspace.activeEditor?.editor;
     if (editor) {
       editor.replaceSelection(text);
-      new Notice('Inserted at cursor');
+      new Notice('Inserted into note');
     } else {
       const file = this.app.workspace.getActiveFile();
       if (!file) { new Notice('No active note'); return; }
@@ -1432,7 +1522,9 @@ class vaultchatSettingsTab extends PluginSettingTab {
         } else {
           new Setting(containerEl)
             .setName(def.apiKeyLabel)
-            .setDesc(`Get yours from ${this.keySource(pid)}`)
+            .setDesc(def.apiKeyRequired
+              ? `Get yours from ${this.keySource(pid)}`
+              : 'Only needed if your server was started with one. Leave blank otherwise.')
             .addText(t => {
               t.inputEl.type = 'password';
               t.setPlaceholder(def.apiKeyPlaceholder).onChange(v => {
@@ -1444,13 +1536,14 @@ class vaultchatSettingsTab extends PluginSettingTab {
         }
       }
 
-      new Setting(containerEl)
+      const known = this.fetchedModels[pid] ?? def.models;
+      const modelSetting = new Setting(containerEl)
         .setName('Model')
         .setDesc(def.dynamicModels ? 'Or type any model id supported by this provider.' : '')
         .addDropdown(dd => {
-          for (const m of def.models) dd.addOption(m.id, m.label);
-          if (ps.model && !def.models.find(m => m.id === ps.model)) dd.addOption(ps.model, ps.model);
-          dd.setValue(ps.model || (def.models[0]?.id ?? ''));
+          for (const m of known) dd.addOption(m.id, m.label);
+          if (ps.model && !known.find(m => m.id === ps.model)) dd.addOption(ps.model, ps.model);
+          dd.setValue(ps.model || (known[0]?.id ?? ''));
           dd.onChange(v => { ps.model = v; void this.plugin.saveSettings(); });
         })
         .addText(t => {
@@ -1462,10 +1555,18 @@ class vaultchatSettingsTab extends PluginSettingTab {
             });
         });
 
+      if (def.dynamicModels) {
+        modelSetting.addExtraButton(b => b
+          .setIcon('refresh-cw')
+          .setTooltip('Refresh model list')
+          .onClick(() => { void this.refreshModels(pid); }),
+        );
+      }
+
       if (def.customBaseUrl) {
         new Setting(containerEl)
           .setName('Base URL')
-          .setDesc('Address where your local model server is running.')
+          .setDesc('Address of your local server, including the port.')
           .addText(t => t
             .setPlaceholder(def.defaultBaseUrl)
             .setValue(ps.baseUrl || def.defaultBaseUrl)
@@ -1473,7 +1574,7 @@ class vaultchatSettingsTab extends PluginSettingTab {
           );
         new Setting(containerEl)
           .setName('Context window (num_ctx)')
-          .setDesc('Tokens pre-allocated for context. Lower values use less memory.')
+          .setDesc('Tokens pre-allocated for context. Lower values use less memory. Ignored by servers that do not support this option.')
           .addText(t => t
             .setValue(String(this.plugin.settings.ollamaNumCtx))
             .onChange(v => {
@@ -1506,7 +1607,7 @@ class vaultchatSettingsTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName('Auto-apply edits')
-      .setDesc('When enabled, file edits are applied immediately with confirm/revert buttons. When disabled, you must click apply manually.')
+      .setDesc('When enabled, file edits are applied immediately with confirm/revert buttons. Notes you attach are sent to the model, so a note containing instructions can cause edits you did not ask for. When disabled, you review each edit and click apply.')
       .addToggle(t => t
         .setValue(this.plugin.settings.autoApplyEdits)
         .onChange(v => { this.plugin.settings.autoApplyEdits = v; void this.plugin.saveSettings(); }),
@@ -1532,7 +1633,7 @@ class vaultchatSettingsTab extends PluginSettingTab {
     copyBtn.addEventListener('click', () => {
       void navigator.clipboard.writeText(ps.apiKey).then(() => {
         copyBtn.textContent = '✓ copied';
-        setTimeout(() => { copyBtn.textContent = 'Copy'; }, 1500);
+        window.setTimeout(() => { copyBtn.textContent = 'Copy'; }, 1500);
       });
     });
 
@@ -1542,13 +1643,39 @@ class vaultchatSettingsTab extends PluginSettingTab {
       .addEventListener('click', () => { ps.apiKey = ''; void this.plugin.saveSettings().then(() => this.display()); });
   }
 
+  // Model lists pulled from a provider on demand, so the settings dropdown can
+  // show them the same way the chat header does.
+  private fetchedModels: Partial<Record<ProviderID, { id: string; label: string }[]>> = {};
+
+  private async refreshModels(pid: ProviderID): Promise<void> {
+    const ps = this.plugin.settings.providers[pid];
+    try {
+      const models = pid === 'local'
+        ? await fetchLocalModels(ps.baseUrl || PROVIDERS.local.defaultBaseUrl, ps.apiKey)
+        : await fetchOpenRouterModels(ps.apiKey);
+      if (models.length === 0) {
+        new Notice('No models available from this provider.');
+        return;
+      }
+      this.fetchedModels[pid] = models;
+      if (!models.find(m => m.id === ps.model)) {
+        ps.model = models[0].id;
+        await this.plugin.saveSettings();
+      }
+      new Notice(`Loaded ${models.length} models.`);
+      this.display();
+    } catch {
+      new Notice('Could not load models. Check the base URL and key.');
+    }
+  }
+
   private keySource(id: ProviderID): string {
     const map: Record<ProviderID, string> = {
       anthropic:  'console.anthropic.com',
       openai:     'platform.openai.com/api-keys',
       gemini:     'aistudio.google.com/apikey',
       openrouter: 'openrouter.ai/keys',
-      ollama:     '',
+      local:      '',
     };
     return map[id];
   }
@@ -1582,7 +1709,9 @@ export default class vaultchatPlugin extends Plugin {
   }
 
   async loadSettings() {
-    this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+    const saved = await this.loadData() as Partial<vaultchatSettings> | null;
+    migrateOllamaProvider(saved);
+    this.settings = Object.assign({}, DEFAULT_SETTINGS, saved);
     for (const id of Object.keys(PROVIDERS) as ProviderID[]) {
       if (!this.settings.providers[id]) {
         this.settings.providers[id] = { ...DEFAULT_SETTINGS.providers[id] };

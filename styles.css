@@ -2,14 +2,9 @@
 /* OKLCH palette, no Inter/Roboto/Arial, no purple gradients */
 
 /* ── Utility classes ───────────────────────────────────────────────────── */
-
-.cs-hidden {
-  display: none !important;
-}
-
-.cs-accent-active {
-  color: var(--cs-accent) !important;
-}
+/* State utilities that must override component rules live at the end of this
+   file, where source order plus a repeated class gives them the specificity
+   they need on their own. */
 
 .cs-settings-model-input {
   width: 160px;
@@ -155,7 +150,7 @@
   background: var(--cs-user-bg);
   color: var(--cs-user-fg);
   padding: 9px 14px;
-  border-radius: 14px 14px 3px 14px;
+  border-radius: 14px 14px 3px;
   max-width: 86%;
   font-size: 13px;
   line-height: 1.55;
@@ -198,8 +193,8 @@
   font-size: 12px;
 }
 
-.cs-msg-error {
-  color: var(--text-error) !important;
+.cs-msg-body.cs-msg-error {
+  color: var(--text-error);
   font-size: 12px;
 }
 
@@ -669,14 +664,14 @@
   white-space: nowrap;
 }
 
-.cs-apply-btn {
+.cs-action-btn.cs-apply-btn {
   font-weight: 600;
-  color: var(--cs-accent) !important;
-  border-color: var(--cs-accent-dim) !important;
+  color: var(--cs-accent);
+  border-color: var(--cs-accent-dim);
 }
-.cs-apply-btn:hover {
-  background: var(--cs-accent) !important;
-  color: var(--cs-accent-text) !important;
+.cs-action-btn.cs-apply-btn:hover {
+  background: var(--cs-accent);
+  color: var(--cs-accent-text);
 }
 
 .cs-diff-container {
@@ -733,22 +728,22 @@
   background: var(--background-secondary);
 }
 
-.cs-confirm-btn {
-  color: oklch(80% 0.12 145) !important;
-  border-color: oklch(50% 0.1 145 / 0.4) !important;
+.cs-action-btn.cs-confirm-btn {
+  color: oklch(80% 0.12 145);
+  border-color: oklch(50% 0.1 145 / 0.4);
 }
-.cs-confirm-btn:hover {
-  background: oklch(45% 0.12 145) !important;
-  color: #fff !important;
+.cs-action-btn.cs-confirm-btn:hover {
+  background: oklch(45% 0.12 145);
+  color: #ffffff;
 }
 
-.cs-revert-btn {
-  color: oklch(80% 0.12 25) !important;
-  border-color: oklch(50% 0.1 25 / 0.4) !important;
+.cs-action-btn.cs-revert-btn {
+  color: oklch(80% 0.12 25);
+  border-color: oklch(50% 0.1 25 / 0.4);
 }
-.cs-revert-btn:hover {
-  background: oklch(45% 0.12 25) !important;
-  color: #fff !important;
+.cs-action-btn.cs-revert-btn:hover {
+  background: oklch(45% 0.12 25);
+  color: #ffffff;
 }
 
 /* ── Delete blocks ──────────────────────────────────────────────────────── */
@@ -800,14 +795,14 @@
   text-align: center;
 }
 
-.cs-delete-confirm-final {
-  color: oklch(90% 0.1 25) !important;
-  border-color: oklch(55% 0.14 25) !important;
-  font-weight: 700 !important;
+.cs-action-btn.cs-delete-confirm-final {
+  color: oklch(90% 0.1 25);
+  border-color: oklch(55% 0.14 25);
+  font-weight: 700;
 }
-.cs-delete-confirm-final:hover {
-  background: oklch(45% 0.15 25) !important;
-  color: #fff !important;
+.cs-action-btn.cs-delete-confirm-final:hover {
+  background: oklch(45% 0.15 25);
+  color: #ffffff;
 }
 
 .cs-delete-status {
@@ -824,4 +819,23 @@
   padding: 3px 12px;
   font-size: 11px;
   color: oklch(75% 0.12 25);
+}
+
+/* ── State utilities (must stay last) ───────────────────────────────────── */
+/* The class is repeated to raise specificity above the single-class component
+   rules above; being last in the file settles ties such as .cs-icon-btn:hover. */
+
+.cs-hidden.cs-hidden {
+  display: none;
+}
+
+.cs-accent-active.cs-accent-active {
+  color: var(--cs-accent);
+}
+
+.cs-thinking {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-style: italic;
+  padding: 2px 0;
 }

@@ -1,6 +1,6 @@
 # VaultChat
 
-Multi-provider AI chat inside Obsidian with file reading, editing, creation, and deletion. Supports Anthropic (Claude), OpenAI, Google Gemini, OpenRouter, and Ollama.
+Multi-provider AI chat inside Obsidian with file reading, editing, creation, and deletion. Supports Anthropic (Claude), OpenAI, Google Gemini, OpenRouter, and any local OpenAI-compatible server such as Ollama or LM Studio.
 
 > **API keys:** You need a standard API key from each provider you want to use. Claude Code OAuth tokens (`sk-ant-oat01-...`) do not work. Anthropic blocks them from third-party API calls.
 
@@ -8,9 +8,10 @@ Multi-provider AI chat inside Obsidian with file reading, editing, creation, and
 
 ## Features
 
-- **Multi-provider** - switch between Anthropic, OpenAI, Gemini, OpenRouter, and Ollama from a single dropdown
+- **Multi-provider** - switch between Anthropic, OpenAI, Gemini, OpenRouter, and local models from a single dropdown
 - **File reading** - attach any vault file to the conversation with the **+** button; the AI sees the full contents
-- **File editing** - the AI proposes edits in a diff format; auto-applied with Confirm/Revert, or manual Apply (configurable)
+- **File editing** - the AI proposes edits in a diff format; review each one with Preview/Apply, or turn on auto-apply (with Confirm/Revert) from the chat footer or settings
+- **Path safety** - edit and delete blocks that point outside the vault are refused
 - **File creation** - ask the AI to create new notes in any folder
 - **File deletion** - the AI can propose file deletions with a double-confirmation safety prompt
 - **Vault awareness** - the AI sees your full file tree so it uses correct paths
@@ -18,7 +19,7 @@ Multi-provider AI chat inside Obsidian with file reading, editing, creation, and
 - **Stop button** - cancel any streaming response mid-generation
 - **Include current note** - one-click toggle to send your active note as context
 - **Streaming** - real-time token streaming from all providers
-- **Dynamic model lists** - Ollama shows installed models; OpenRouter fetches all available models
+- **Dynamic model lists** - local servers report their loaded models; OpenRouter fetches all available models. Refresh from the chat header or from settings
 
 ## Providers
 
@@ -28,7 +29,7 @@ Multi-provider AI chat inside Obsidian with file reading, editing, creation, and
 | OpenAI        | platform.openai.com   | Bearer token                    |
 | Google Gemini | aistudio.google.com   | OpenAI-compatible endpoint      |
 | OpenRouter    | openrouter.ai         | Access 100+ models with one key |
-| Ollama        | No key needed         | Runs locally; set your base URL |
+| Local         | No key needed         | Any OpenAI-compatible server; set your base URL |
 
 ## Installation
 
@@ -58,34 +59,45 @@ cp main.js manifest.json styles.css /path/to/your/vault/.obsidian/plugins/VaultC
 
 Restart Obsidian. The plugin will appear in **Settings > Community Plugins**.
 
-## Ollama setup
+## Local model setup
 
-Ollama lets you run models locally. No API key, no cost, no data leaving your machine.
+The **Local (OpenAI-compatible)** provider works with any server that exposes the OpenAI chat-completions API. No API key, no cost, no data leaving your machine. Tested with Ollama and LM Studio; llama.cpp, vLLM, LocalAI, and Jan expose the same API and should work too.
 
-**1. Install Ollama**
+**1. Install a server**
 
-Download from [ollama.com](https://ollama.com) and run the installer. On Mac it runs as a menu bar app that starts automatically.
+| Server | Where | Default base URL |
+| ------ | ----- | ---------------- |
+| Ollama | [ollama.com](https://ollama.com) | `http://localhost:11434` |
+| LM Studio | [lmstudio.ai](https://lmstudio.ai) | `http://localhost:1234` |
 
-**2. Pull a model**
+**2. Get a model**
 
-Open Terminal and run one of these:
+With Ollama, pull one from the terminal:
 
 ```bash
 ollama pull llama3.2        # 2GB, good general purpose
-ollama pull llama3.2:1b     # 1GB, fastest/smallest
+ollama pull llama3.2:1b     # 1GB, fastest and smallest
 ollama pull mistral         # 4GB, strong reasoning
-ollama pull codellama       # 4GB, code-focused
-ollama pull gemma3          # 5GB, Google's open model
 ollama pull qwen2.5         # 4GB, strong at multilingual
 ```
 
-To see what you have installed: `ollama list`
+With LM Studio, download a model from its in-app browser and start the local server from the **Developer** tab.
 
 **3. Open VaultChat**
 
-Select **Ollama** from the provider dropdown. The model list will auto-populate from your installed models. The base URL defaults to `http://localhost:11434`. Only change it if you're running Ollama on a different machine.
+Select **Local (OpenAI-compatible)** from the provider dropdown and set the base URL to match your server. The model list populates from the server's `/v1/models` endpoint, so it shows whatever that server has available.
 
-**Note:** Ollama must be running for the model list to load. If the dropdown shows "Fetch failed", open the Ollama app or run `ollama serve` in Terminal, then hit the refresh button.
+If your server needs an API key (vLLM started with `--api-key`, a LiteLLM proxy, and similar), put it in the **API key** field for this provider. Leave it blank when the server does not use one.
+
+**Note:** the server must be running for the model list to load. If the dropdown shows "Fetch failed", start the server, confirm the base URL and port, then hit the refresh button.
+
+**Use `127.0.0.1` rather than `localhost`.** Most local servers listen on IPv4 only, while `localhost` can resolve to IPv6 first and fail with a connection-refused error. VaultChat now substitutes the address automatically, but typing it directly avoids the whole class of problem.
+
+Upgrading from an older version: your Ollama base URL and model carry over automatically.
+
+### Known limitation
+
+Models that stream their chain of thought as `reasoning_content` (many reasoning models, and routers that proxy them) do not render their output correctly yet. A "Thinking…" indicator shows while those tokens arrive, but the final answer may not appear. Non-reasoning models are unaffected.
 
 ---
 
@@ -106,13 +118,13 @@ Select **Ollama** from the provider dropdown. The model list will auto-populate 
 
 Go to **Settings > VaultChat** to configure:
 
-- **API keys** for each provider (stored locally, obfuscated after entry)
-- **Default model** per provider
+- **API keys** for each provider (stored locally, obfuscated after entry). The key for a local server is optional; leave it blank unless the server was started with one
+- **Default model** per provider, with a refresh button for providers that report their own model list
 - **Custom base URL** per provider (for proxies or self-hosted endpoints)
-- **Context window (num_ctx)** for Ollama - controls RAM usage (default 4096 tokens)
+- **Context window (num_ctx)** for local servers - controls RAM usage on Ollama (default 4096 tokens); servers that do not support the option ignore it
 - **System prompt** - customize the AI's behavior
 - **Max tokens** - maximum response length
-- **Auto-apply edits** - toggle between auto-apply (with Confirm/Revert) and manual Apply mode
+- **Auto-apply edits** - toggle between auto-apply (with Confirm/Revert) and manual Apply mode. Off by default, and also togglable from the chat footer so you can flip it without leaving the conversation
 
 ## Development
 

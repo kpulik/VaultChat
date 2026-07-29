@@ -1,14 +1,21 @@
 # VaultChat
 
-Multi-provider AI chat inside Obsidian with file reading, editing, creation, and deletion. Supports Anthropic (Claude), OpenAI, Google Gemini, OpenRouter, and any local OpenAI-compatible server such as Ollama or LM Studio.
+A local-first AI chat for Obsidian that can actually **edit your vault**.
 
-> **API keys:** You need a standard API key from each provider you want to use. Claude Code OAuth tokens (`sk-ant-oat01-...`) do not work. Anthropic blocks them from third-party API calls.
+Point it at Ollama, LM Studio, or any OpenAI-compatible server and the model can read your notes, propose edits as a reviewable diff, create new notes, and delete files behind a double confirmation. Nothing leaves your machine unless you choose a hosted provider.
+
+Most local-model plugins for Obsidian only chat. This one writes.
+
+Hosted providers are supported too and are entirely optional: Anthropic (Claude), OpenAI, Google Gemini, and OpenRouter.
+
+> **Local needs no API key.** Hosted providers each need their own standard key. Claude Code OAuth tokens (`sk-ant-oat01-...`) do not work, and using them in a third-party tool violates Anthropic's terms.
 
 ---
 
 ## Features
 
-- **Multi-provider** - switch between Anthropic, OpenAI, Gemini, OpenRouter, and local models from a single dropdown
+- **Runs fully local** - Ollama, LM Studio, llama.cpp, vLLM, LocalAI, Jan, or anything else speaking the OpenAI API. No key, no cost, no data leaving your machine
+- **Multi-provider** - switch between local models, Anthropic, OpenAI, Gemini, and OpenRouter from a single dropdown
 - **File reading** - attach any vault file to the conversation with the **+** button; the AI sees the full contents
 - **File editing** - the AI proposes edits in a diff format; review each one with Preview/Apply, or turn on auto-apply (with Confirm/Revert) from the chat footer or settings
 - **Path safety** - edit and delete blocks that point outside the vault are refused
@@ -25,11 +32,11 @@ Multi-provider AI chat inside Obsidian with file reading, editing, creation, and
 
 | Provider      | API key source        | Notes                           |
 | ------------- | --------------------- | ------------------------------- |
+| **Local**     | **None needed**       | **Default.** Any OpenAI-compatible server; set your base URL |
 | Anthropic     | console.anthropic.com | Uses `x-api-key` header         |
 | OpenAI        | platform.openai.com   | Bearer token                    |
 | Google Gemini | aistudio.google.com   | OpenAI-compatible endpoint      |
 | OpenRouter    | openrouter.ai         | Access 100+ models with one key |
-| Local         | No key needed         | Any OpenAI-compatible server; set your base URL |
 
 ## Installation
 

@@ -81,7 +81,26 @@ interface ProviderDef {
   customBaseUrl:     boolean;
 }
 
+// Order matters: this is the order of the provider dropdown in both the chat
+// header and the settings tab. Local comes first because running a local model
+// is what this plugin is for; the hosted providers are the fallback.
 const PROVIDERS: Record<ProviderID, ProviderDef> = {
+  local: {
+    // Any server that speaks the OpenAI chat-completions API: Ollama, LM Studio,
+    // llama.cpp, vLLM, LocalAI, Jan. Models are read from /v1/models.
+    name: 'Local (OpenAI-compatible)',
+    format: 'openai',
+    // 127.0.0.1 rather than localhost: Node resolves localhost to ::1 first, and
+    // most local servers bind IPv4 only, which surfaces as ECONNREFUSED.
+    defaultBaseUrl: 'http://127.0.0.1:11434',
+    endpoint: '/v1/chat/completions',
+    models: [],
+    apiKeyLabel: 'API key',
+    apiKeyPlaceholder: 'Leave blank if your server does not need one',
+    apiKeyRequired: false,
+    dynamicModels: true,
+    customBaseUrl: true,
+  },
   anthropic: {
     name: 'Anthropic',
     format: 'anthropic',
@@ -157,22 +176,6 @@ const PROVIDERS: Record<ProviderID, ProviderDef> = {
     apiKeyRequired: true,
     dynamicModels: true,
     customBaseUrl: false,
-  },
-  local: {
-    // Any server that speaks the OpenAI chat-completions API: Ollama, LM Studio,
-    // llama.cpp, vLLM, LocalAI, Jan. Models are read from /v1/models.
-    name: 'Local (OpenAI-compatible)',
-    format: 'openai',
-    // 127.0.0.1 rather than localhost: Node resolves localhost to ::1 first, and
-    // most local servers bind IPv4 only, which surfaces as ECONNREFUSED.
-    defaultBaseUrl: 'http://127.0.0.1:11434',
-    endpoint: '/v1/chat/completions',
-    models: [],
-    apiKeyLabel: 'API key',
-    apiKeyPlaceholder: 'Leave blank if your server does not need one',
-    apiKeyRequired: false,
-    dynamicModels: true,
-    customBaseUrl: true,
   },
 };
 
@@ -423,13 +426,13 @@ function migrateOllamaProvider(saved: Partial<vaultchatSettings> | null): void {
 }
 
 const DEFAULT_SETTINGS: vaultchatSettings = {
-  activeProvider: 'anthropic',
+  activeProvider: 'local',
   providers: {
+    local:      { apiKey: '', model: '',                   baseUrl: 'http://127.0.0.1:11434' },
     anthropic:  { apiKey: '', model: 'claude-opus-5',      baseUrl: '' },
     openai:     { apiKey: '', model: 'gpt-5.6-sol',        baseUrl: '' },
     gemini:     { apiKey: '', model: 'gemini-3.6-flash',   baseUrl: '' },
     openrouter: { apiKey: '', model: 'openai/gpt-5.6-sol', baseUrl: '' },
-    local:      { apiKey: '', model: '',                   baseUrl: 'http://localhost:11434' },
   },
   systemPrompt: 'You are a helpful assistant integrated into Obsidian. Be concise and precise.',
   maxTokens: 0,

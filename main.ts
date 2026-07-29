@@ -830,11 +830,14 @@ class vaultchatView extends ItemView {
       }
       this.modelSelEl.disabled = false;
       const validCur = models.find(m => m.id === cur) ? cur : '';
-      if (!validCur) {
+      if (!cur) {
+        // Nothing chosen yet, so adopt whatever the server lists first. A model
+        // that is set but missing from the list is left alone: it may just be
+        // unloaded right now, and overwriting it would discard a real choice.
         this.plugin.settings.providers[id].model = models[0].id;
         void this.plugin.saveSettings();
       }
-      this.populateSelect(models, validCur || models[0].id);
+      this.populateSelect(models, validCur || cur || models[0].id);
     } catch {
       if (gen !== this.modelLoadGen) return;
       this.modelSelEl.disabled = false;
@@ -854,7 +857,13 @@ class vaultchatView extends ItemView {
       const opt = this.modelSelEl.createEl('option', { value: m.id, text: m.label });
       if (m.id === current) { opt.selected = true; matched = true; }
     }
-    if (!matched && models.length > 0) {
+    // A saved model that is not in the catalog is kept as its own option rather
+    // than silently falling back to the first entry. Falling back changed which
+    // model the header showed without changing the stored setting, so the header
+    // and the settings tab disagreed and the choice looked like it had not stuck.
+    if (!matched && current) {
+      this.modelSelEl.createEl('option', { value: current, text: current }).selected = true;
+    } else if (!matched && models.length > 0) {
       this.modelSelEl.options[0].selected = true;
     }
   }

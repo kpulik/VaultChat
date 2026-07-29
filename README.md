@@ -95,9 +95,13 @@ If your server needs an API key (vLLM started with `--api-key`, a LiteLLM proxy,
 
 Upgrading from an older version: your Ollama base URL and model carry over automatically.
 
-### Known limitation
+### Reasoning models
 
-Models that stream their chain of thought as `reasoning_content` (many reasoning models, and routers that proxy them) do not render their output correctly yet. A "Thinking…" indicator shows while those tokens arrive, but the final answer may not appear. Non-reasoning models are unaffected.
+Reasoning models stream their chain of thought separately from their answer. VaultChat shows a "Thinking…" indicator while that is happening and then renders the answer when it arrives. The chain of thought is not added to the transcript.
+
+### Empty responses
+
+If a model or router accepts the request but sends nothing back, VaultChat says so rather than leaving a blank message. This usually means the route you picked has no working upstream, so try a different model.
 
 ---
 

@@ -607,6 +607,7 @@ class vaultchatView extends ItemView {
   private refreshBtn!:     HTMLButtonElement;
 
   private cancelStream: (() => void) | null = null;
+  private stoppedByUser = false;
   private modelLoadGen = 0;
   private renderComponents: Component[] = [];
 
@@ -724,6 +725,7 @@ class vaultchatView extends ItemView {
     });
     this.stopBtn.addClass('cs-hidden');
     this.stopBtn.addEventListener('click', () => {
+      this.stoppedByUser = true;
       this.cancelStream?.();
       this.cancelStream = null;
     });
@@ -1418,6 +1420,7 @@ class vaultchatView extends ItemView {
     this.appendUserBubble(text);
 
     this.streaming = true;
+    this.stoppedByUser = false;
     this.sendBtn.disabled = true;
     this.sendBtn.addClass('cs-hidden');
     this.stopBtn.removeClass('cs-hidden');
@@ -1449,12 +1452,22 @@ class vaultchatView extends ItemView {
       () => {
         thinkingEl?.remove();
         thinkingEl = null;
-        this.history.push({ role: 'assistant', content: acc });
         this.cancelStream = null;
         this.streaming = false;
         this.stopBtn.addClass('cs-hidden');
         this.sendBtn.removeClass('cs-hidden');
         this.sendBtn.disabled = false;
+        if (!acc) {
+          // A 200 that carries no content at all. Routers answer this way when an
+          // upstream declines the request, so say so instead of leaving a blank
+          // bubble that looks like the plugin failed silently.
+          bodyEl.addClass('cs-msg-error');
+          bodyEl.textContent = this.stoppedByUser
+            ? '⚠ Stopped before the model replied.'
+            : '⚠ The model returned an empty response. Try a different model.';
+          return;
+        }
+        this.history.push({ role: 'assistant', content: acc });
         this.addMessageActions(bubble, acc);
         void this.persistSession();
       },

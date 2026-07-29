@@ -1462,9 +1462,10 @@ class vaultchatView extends ItemView {
           // upstream declines the request, so say so instead of leaving a blank
           // bubble that looks like the plugin failed silently.
           bodyEl.addClass('cs-msg-error');
+          const usedModel = this.plugin.settings.providers[this.plugin.settings.activeProvider].model;
           bodyEl.textContent = this.stoppedByUser
             ? '⚠ Stopped before the model replied.'
-            : '⚠ The model returned an empty response. Try a different model.';
+            : `⚠ ${usedModel} returned an empty response. That model or route is not answering, so try a different one.`;
           return;
         }
         this.history.push({ role: 'assistant', content: acc });

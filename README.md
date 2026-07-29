@@ -125,9 +125,9 @@ Go to **Settings > VaultChat** to configure:
 - **API keys** for each provider (stored locally, obfuscated after entry). The key for a local server is optional; leave it blank unless the server was started with one
 - **Default model** per provider, with a refresh button for providers that report their own model list
 - **Custom base URL** per provider (for proxies or self-hosted endpoints)
-- **Context window (num_ctx)** for local servers - controls RAM usage on Ollama (default 4096 tokens); servers that do not support the option ignore it
+- **Context window (num_ctx)** for local servers - controls RAM usage on Ollama. Leave at 0 (the default) to let the server choose; servers that do not support the option ignore it
 - **System prompt** - customize the AI's behavior
-- **Max tokens** - maximum response length
+- **Max tokens** - maximum response length. Leave at 0 (the default) to let the model decide. Anthropic's API requires the field, so 0 sends 4096 there
 - **Auto-apply edits** - toggle between auto-apply (with Confirm/Revert) and manual Apply mode. Off by default, and also togglable from the chat footer so you can flip it without leaving the conversation
 
 ## Development

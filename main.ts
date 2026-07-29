@@ -432,12 +432,15 @@ const DEFAULT_SETTINGS: vaultchatSettings = {
     local:      { apiKey: '', model: '',                   baseUrl: 'http://localhost:11434' },
   },
   systemPrompt: 'You are a helpful assistant integrated into Obsidian. Be concise and precise.',
-  maxTokens: 4096,
-  ollamaNumCtx: 4096,
+  maxTokens: 0,
+  ollamaNumCtx: 0,
   autoApplyEdits: false,
 };
 
 // ─── API ─────────────────────────────────────────────────────────────────────
+
+// Used only when max tokens is left at 0 and the provider requires the field.
+const ANTHROPIC_DEFAULT_MAX_TOKENS = 4096;
 
 interface StreamEvent {
   type?: string;
@@ -475,7 +478,9 @@ function streamMessage(
   if (def.format === 'anthropic') {
     const body = {
       model:      ps.model,
-      max_tokens: settings.maxTokens,
+      // Anthropic requires max_tokens, so 0 cannot mean "omit it" here the way
+      // it does for the OpenAI-shaped providers. It falls back instead.
+      max_tokens: settings.maxTokens > 0 ? settings.maxTokens : ANTHROPIC_DEFAULT_MAX_TOKENS,
       system:     systemPromptOverride,
       messages:   history,
       stream:     true,
@@ -493,12 +498,16 @@ function streamMessage(
       ...history,
     ];
     const body: Record<string, unknown> = {
-      model:      ps.model,
+      model:    ps.model,
       messages,
-      stream:     true,
-      max_tokens: settings.maxTokens,
+      stream:   true,
     };
-    if (providerID === 'local') {
+    // Both of these are omitted at 0 so the provider applies its own default,
+    // which is what a router or a local server is usually better at deciding.
+    if (settings.maxTokens > 0) {
+      body['max_tokens'] = settings.maxTokens;
+    }
+    if (providerID === 'local' && settings.ollamaNumCtx > 0) {
       // Ollama-style hint. Servers that don't understand it ignore it.
       body['options'] = { num_ctx: settings.ollamaNumCtx };
     }
@@ -1597,12 +1606,13 @@ class vaultchatSettingsTab extends PluginSettingTab {
           );
         new Setting(containerEl)
           .setName('Context window (num_ctx)')
-          .setDesc('Tokens pre-allocated for context. Lower values use less memory. Ignored by servers that do not support this option.')
+          .setDesc('Tokens pre-allocated for context. Leave at 0 to let the server choose. Lower values use less memory. Ignored by servers that do not support this option.')
           .addText(t => t
+            .setPlaceholder('0')
             .setValue(String(this.plugin.settings.ollamaNumCtx))
             .onChange(v => {
-              const n = parseInt(v);
-              if (!isNaN(n) && n > 0) { this.plugin.settings.ollamaNumCtx = n; void this.plugin.saveSettings(); }
+              const n = v.trim() === '' ? 0 : parseInt(v);
+              if (!isNaN(n) && n >= 0) { this.plugin.settings.ollamaNumCtx = n; void this.plugin.saveSettings(); }
             }),
           );
       }
@@ -1619,12 +1629,13 @@ class vaultchatSettingsTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName('Max tokens')
-      .setDesc('Maximum response length (default 4096)')
+      .setDesc('Maximum response length. Leave at 0 to let the model decide. Anthropic requires a value, so 0 sends 4096 there.')
       .addText(t => t
+        .setPlaceholder('0')
         .setValue(String(this.plugin.settings.maxTokens))
         .onChange(v => {
-          const n = parseInt(v);
-          if (!isNaN(n) && n > 0) { this.plugin.settings.maxTokens = n; void this.plugin.saveSettings(); }
+          const n = v.trim() === '' ? 0 : parseInt(v);
+          if (!isNaN(n) && n >= 0) { this.plugin.settings.maxTokens = n; void this.plugin.saveSettings(); }
         }),
       );
 

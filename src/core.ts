@@ -1,0 +1,100 @@
+// Pure logic with no Obsidian imports, so it can be unit tested outside the app.
+// Anything here that needs Obsidian's normalizePath takes it as an argument
+// rather than importing it.
+
+export interface EditBlock {
+  filePath: string;
+  edits:    { original: string; replacement: string }[];
+}
+
+export interface DeleteBlock {
+  filePaths: string[];
+}
+
+export type Normalizer = (p: string) => string;
+
+// A base URL is accepted both bare (http://host:port) and with the /v1 suffix
+// that most OpenAI-compatible servers document, so the caller can paste either
+// without ending up requesting /v1/v1/....
+export function apiBasePath(url: URL): string {
+  const p = url.pathname.replace(/\/$/, '');
+  return p === '' ? '' : p.replace(/\/v1$/, '');
+}
+
+// Node resolves "localhost" to ::1 first, while most local model servers listen
+// on IPv4 only. Connecting by address turns a confusing ECONNREFUSED ::1 into a
+// working request. Remote providers never hit this branch.
+export function resolveHost(hostname: string): string {
+  return hostname === 'localhost' ? '127.0.0.1' : hostname;
+}
+
+// Paths in edit and delete blocks come from the model, so they are untrusted.
+// Obsidian resolves '..' against the vault root, which would let a response write
+// outside the vault entirely. Anything with a '..' segment is refused.
+export function isSafeVaultPath(p: string, normalize: Normalizer): boolean {
+  const norm = normalize(p);
+  return norm.length > 0 && norm !== '/' && !norm.split('/').includes('..');
+}
+
+export function parseEditBlocks(text: string, normalize: Normalizer): EditBlock[] {
+  const blocks: EditBlock[] = [];
+  const blockRegex = /```edit:(.+?)\n([\s\S]*?)```/g;
+  let match: RegExpExecArray | null;
+  while ((match = blockRegex.exec(text)) !== null) {
+    const filePath = match[1].trim();
+    const body = match[2];
+    const edits: { original: string; replacement: string }[] = [];
+
+    // The newline before the markers is optional so that an empty ORIGINAL (the
+    // documented way to create a new file) and an empty MODIFIED both parse.
+    const editRegex = /<<<<<<< ORIGINAL\n([\s\S]*?)\n?=======\n([\s\S]*?)\n?>>>>>>> MODIFIED/g;
+    let editMatch: RegExpExecArray | null;
+    while ((editMatch = editRegex.exec(body)) !== null) {
+      edits.push({ original: editMatch[1], replacement: editMatch[2] });
+    }
+
+    if (edits.length > 0 && isSafeVaultPath(filePath, normalize)) {
+      blocks.push({ filePath: normalize(filePath), edits });
+    }
+  }
+  return blocks;
+}
+
+export function parseDeleteBlocks(text: string, normalize: Normalizer): DeleteBlock[] {
+  const blocks: DeleteBlock[] = [];
+  const regex = /```delete\n([\s\S]*?)```/g;
+  let match: RegExpExecArray | null;
+  while ((match = regex.exec(text)) !== null) {
+    const paths = match[1].trim().split('\n')
+      .map(l => l.trim())
+      .filter(l => l.length > 0 && isSafeVaultPath(l, normalize))
+      .map(l => normalize(l));
+    if (paths.length > 0) {
+      blocks.push({ filePaths: paths });
+    }
+  }
+  return blocks;
+}
+
+// Secret ids must be lowercase alphanumeric with optional dashes.
+export function secretId(providerId: string): string {
+  return `vaultchat-${providerId}`;
+}
+
+// Extracts the visible answer from one OpenAI-shaped SSE line. Reasoning models
+// stream their chain of thought as reasoning_content and only the answer as
+// content, so the two are reported separately.
+export function parseSseLine(line: string): { done: boolean; content?: string; reasoning?: boolean } {
+  if (!line.startsWith('data: ')) return { done: false };
+  const payload = line.slice(6).trim();
+  if (payload === '[DONE]') return { done: true };
+  try {
+    const evt = JSON.parse(payload) as {
+      choices?: { delta?: { content?: string; reasoning_content?: string } }[];
+    };
+    const delta = evt.choices?.[0]?.delta;
+    if (delta?.content) return { done: false, content: delta.content };
+    if (delta?.reasoning_content) return { done: false, reasoning: true };
+  } catch { /* ignore SSE parse errors */ }
+  return { done: false };
+}

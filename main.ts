@@ -8,11 +8,20 @@ import {
   Plugin,
   PluginSettingTab,
   Setting,
+  SecretStorage,
   TFile,
   WorkspaceLeaf,
   normalizePath,
   setIcon,
 } from 'obsidian';
+import {
+  apiBasePath,
+  parseDeleteBlocks as parseDeleteBlocksCore,
+  parseEditBlocks as parseEditBlocksCore,
+  resolveHost,
+  secretId,
+} from './src/core';
+import type { DeleteBlock, EditBlock } from './src/core';
 import * as http from 'http';
 import * as https from 'https';
 
@@ -194,14 +203,7 @@ interface ChatSession {
 
 // ─── Edit Block Types ─────────────────────────────────────────────────────────
 
-interface EditBlock {
-  filePath: string;
-  edits:    { original: string; replacement: string }[];
-}
 
-interface DeleteBlock {
-  filePaths: string[];
-}
 
 // ─── File Suggest Modal ───────────────────────────────────────────────────────
 
@@ -262,68 +264,30 @@ function maskToken(token: string): string {
   return token.slice(0, 12) + '  ●●●●●●●●●●●●●●●●●●●●  ' + token.slice(-4);
 }
 
-// Paths in edit and delete blocks come from the model, so they are untrusted.
-// Obsidian resolves '..' against the vault root, which would let a response write
-// outside the vault entirely. Anything with a '..' segment is refused.
-function isSafeVaultPath(p: string): boolean {
-  const norm = normalizePath(p);
-  return norm.length > 0 && norm !== '/' && !norm.split('/').includes('..');
+// The parsers live in src/core.ts so they can be unit tested without Obsidian;
+// these wrappers bind the app's normalizePath.
+const parseEditBlocks   = (t: string): EditBlock[]   => parseEditBlocksCore(t, normalizePath);
+const parseDeleteBlocks = (t: string): DeleteBlock[] => parseDeleteBlocksCore(t, normalizePath);
+
+// ─── API key storage ──────────────────────────────────────────────────────────
+// Keys used to live in the plugin's data.json in plain text, which sits inside the
+// vault and therefore inside whatever the user syncs. Obsidian's SecretStorage
+// arrived in 1.11.4, below which this plugin still runs, so probe for it at
+// runtime instead of trusting the typings to match the running app.
+
+// Feature probe kept as belt and braces even though minAppVersion now guarantees
+// SecretStorage exists, so a force-installed copy on an older app degrades to the
+// plain-text path rather than throwing.
+function secureStore(app: App): SecretStorage | null {
+  const s = (app as { secretStorage?: SecretStorage }).secretStorage;
+  return s && typeof s.setSecret === 'function' ? s : null;
 }
 
-function parseEditBlocks(text: string): EditBlock[] {
-  const blocks: EditBlock[] = [];
-  const blockRegex = /```edit:(.+?)\n([\s\S]*?)```/g;
-  let match: RegExpExecArray | null;
-  while ((match = blockRegex.exec(text)) !== null) {
-    const filePath = match[1].trim();
-    const body = match[2];
-    const edits: { original: string; replacement: string }[] = [];
 
-    // The newline before the markers is optional so that an empty ORIGINAL (the
-    // documented way to create a new file) and an empty MODIFIED both parse.
-    const editRegex = /<<<<<<< ORIGINAL\n([\s\S]*?)\n?=======\n([\s\S]*?)\n?>>>>>>> MODIFIED/g;
-    let editMatch: RegExpExecArray | null;
-    while ((editMatch = editRegex.exec(body)) !== null) {
-      edits.push({ original: editMatch[1], replacement: editMatch[2] });
-    }
 
-    if (edits.length > 0 && isSafeVaultPath(filePath)) {
-      blocks.push({ filePath: normalizePath(filePath), edits });
-    }
-  }
-  return blocks;
-}
 
-function parseDeleteBlocks(text: string): DeleteBlock[] {
-  const blocks: DeleteBlock[] = [];
-  const regex = /```delete\n([\s\S]*?)```/g;
-  let match: RegExpExecArray | null;
-  while ((match = regex.exec(text)) !== null) {
-    const paths = match[1].trim().split('\n')
-      .map(l => l.trim())
-      .filter(l => l.length > 0 && isSafeVaultPath(l))
-      .map(l => normalizePath(l));
-    if (paths.length > 0) {
-      blocks.push({ filePaths: paths });
-    }
-  }
-  return blocks;
-}
 
-// A base URL is accepted both bare (http://host:port) and with the /v1 suffix
-// that most OpenAI-compatible servers document, so the caller can paste either
-// without ending up requesting /v1/v1/....
-function apiBasePath(url: URL): string {
-  const p = url.pathname.replace(/\/$/, '');
-  return p === '' ? '' : p.replace(/\/v1$/, '');
-}
 
-// Node resolves "localhost" to ::1 first, while most local model servers listen
-// on IPv4 only. Connecting by address turns a confusing ECONNREFUSED ::1 into a
-// working request. Remote providers never hit this branch.
-function resolveHost(hostname: string): string {
-  return hostname === 'localhost' ? '127.0.0.1' : hostname;
-}
 
 // Reads the OpenAI-compatible /v1/models endpoint, which Ollama, LM Studio,
 // llama.cpp, vLLM, LocalAI and Jan all serve.
@@ -455,6 +419,9 @@ interface StreamEvent {
 
 function streamMessage(
   settings: vaultchatSettings,
+  // Resolved by the caller, because the key may live in SecretStorage rather
+  // than in settings.
+  apiKey:   string,
   history:  Message[],
   systemPromptOverride: string,
   onChunk:  (text: string) => void,
@@ -490,7 +457,7 @@ function streamMessage(
     };
     bodyStr = JSON.stringify(body);
     headers = {
-      'x-api-key':         ps.apiKey,
+      'x-api-key':         apiKey,
       'Content-Type':      'application/json',
       'anthropic-version': '2023-06-01',
       'Content-Length':    Buffer.byteLength(bodyStr),
@@ -518,7 +485,7 @@ function streamMessage(
     headers = {
       // Local servers started without a key ignore this; some still require the
       // header to be present, so send a placeholder rather than omitting it.
-      'Authorization':  `Bearer ${ps.apiKey || 'no-key'}`,
+      'Authorization':  `Bearer ${apiKey || 'no-key'}`,
       'Content-Type':   'application/json',
       'Content-Length': Buffer.byteLength(bodyStr),
     };
@@ -828,9 +795,9 @@ class vaultchatView extends ItemView {
       if (id === 'local') {
         const lps     = this.plugin.settings.providers.local;
         const baseUrl = lps.baseUrl || PROVIDERS.local.defaultBaseUrl;
-        models = await fetchLocalModels(baseUrl, lps.apiKey);
+        models = await fetchLocalModels(baseUrl, this.plugin.getApiKey('local'));
       } else {
-        const apiKey = this.plugin.settings.providers.openrouter.apiKey;
+        const apiKey = this.plugin.getApiKey('openrouter');
         models = apiKey ? await fetchOpenRouterModels(apiKey) : def.models;
       }
       if (gen !== this.modelLoadGen) return;
@@ -1378,7 +1345,7 @@ class vaultchatView extends ItemView {
     const def = PROVIDERS[id];
     const ps  = this.plugin.settings.providers[id];
 
-    if (def.apiKeyRequired && !ps.apiKey) {
+    if (def.apiKeyRequired && !this.plugin.getApiKey(id)) {
       new Notice(`vaultchat: Add your ${def.name} API key in Settings`);
       return;
     }
@@ -1456,6 +1423,7 @@ class vaultchatView extends ItemView {
 
     this.cancelStream = streamMessage(
       this.plugin.settings,
+      this.plugin.getApiKey(this.plugin.settings.activeProvider),
       this.history,
       systemPrompt,
       chunk => {
@@ -1552,7 +1520,7 @@ class vaultchatSettingsTab extends PluginSettingTab {
       new Setting(containerEl).setName(def.name).setHeading();
 
       if (def.apiKeyLabel !== null) {
-        if (ps.apiKey) {
+        if (this.plugin.getApiKey(pid)) {
           this.renderSavedKey(containerEl, def.apiKeyLabel, pid);
         } else {
           new Setting(containerEl)
@@ -1563,9 +1531,9 @@ class vaultchatSettingsTab extends PluginSettingTab {
             .addText(t => {
               t.inputEl.type = 'password';
               t.setPlaceholder(def.apiKeyPlaceholder).onChange(v => {
-                ps.apiKey = v.trim();
-                void this.plugin.saveSettings();
-                if (v.trim()) this.display();
+                void this.plugin.setApiKey(pid, v.trim()).then(() => {
+                  if (v.trim()) this.display();
+                });
               });
             });
         }
@@ -1652,32 +1620,35 @@ class vaultchatSettingsTab extends PluginSettingTab {
   }
 
   private renderSavedKey(containerEl: HTMLElement, label: string, pid: ProviderID) {
-    const ps = this.plugin.settings.providers[pid];
+    const key = this.plugin.getApiKey(pid);
     let revealed = false;
-    const s = new Setting(containerEl).setName(label).setDesc('Key saved.');
-    const displayEl = s.controlEl.createEl('code', { cls: 'cs-token-display', text: maskToken(ps.apiKey) });
+    const secure = secureStore(this.app) !== null;
+    const s = new Setting(containerEl)
+      .setName(label)
+      .setDesc(secure ? 'Key saved to Obsidian secret storage.' : 'Key saved.');
+    const displayEl = s.controlEl.createEl('code', { cls: 'cs-token-display', text: maskToken(key) });
     s.controlEl.createEl('br');
     const row = s.controlEl.createDiv('cs-token-btn-row');
 
     const revealBtn = row.createEl('button', { cls: 'cs-tok-btn', text: 'Reveal' });
     revealBtn.addEventListener('click', () => {
       revealed = !revealed;
-      displayEl.textContent = revealed ? ps.apiKey : maskToken(ps.apiKey);
+      displayEl.textContent = revealed ? key : maskToken(key);
       revealBtn.textContent  = revealed ? 'Hide' : 'Reveal';
     });
 
     const copyBtn = row.createEl('button', { cls: 'cs-tok-btn', text: 'Copy' });
     copyBtn.addEventListener('click', () => {
-      void navigator.clipboard.writeText(ps.apiKey).then(() => {
+      void navigator.clipboard.writeText(key).then(() => {
         copyBtn.textContent = '✓ copied';
         window.setTimeout(() => { copyBtn.textContent = 'Copy'; }, 1500);
       });
     });
 
     row.createEl('button', { cls: 'cs-tok-btn', text: 'Replace' })
-      .addEventListener('click', () => { ps.apiKey = ''; void this.plugin.saveSettings(); this.display(); });
+      .addEventListener('click', () => { void this.plugin.setApiKey(pid, '').then(() => this.display()); });
     row.createEl('button', { cls: 'cs-tok-btn cs-tok-btn--danger', text: 'Remove' })
-      .addEventListener('click', () => { ps.apiKey = ''; void this.plugin.saveSettings().then(() => this.display()); });
+      .addEventListener('click', () => { void this.plugin.setApiKey(pid, '').then(() => this.display()); });
   }
 
   // Model lists pulled from a provider on demand, so the settings dropdown can
@@ -1688,8 +1659,8 @@ class vaultchatSettingsTab extends PluginSettingTab {
     const ps = this.plugin.settings.providers[pid];
     try {
       const models = pid === 'local'
-        ? await fetchLocalModels(ps.baseUrl || PROVIDERS.local.defaultBaseUrl, ps.apiKey)
-        : await fetchOpenRouterModels(ps.apiKey);
+        ? await fetchLocalModels(ps.baseUrl || PROVIDERS.local.defaultBaseUrl, this.plugin.getApiKey(pid))
+        : await fetchOpenRouterModels(this.plugin.getApiKey(pid));
       if (models.length === 0) {
         new Notice('No models available from this provider.');
         return;
@@ -1754,6 +1725,52 @@ export default class vaultchatPlugin extends Plugin {
         this.settings.providers[id] = { ...DEFAULT_SETTINGS.providers[id] };
       }
     }
+    await this.migrateKeysToSecureStorage();
+  }
+
+  // Moves any plain-text key found in data.json into SecretStorage. A key whose
+  // move fails is left in place so the user is never locked out of a provider;
+  // the next load tries again.
+  private async migrateKeysToSecureStorage(): Promise<void> {
+    const store = secureStore(this.app);
+    if (!store) return;
+    let moved = false;
+    for (const id of Object.keys(PROVIDERS) as ProviderID[]) {
+      const plain = this.settings.providers[id].apiKey;
+      if (!plain) continue;
+      try {
+        store.setSecret(secretId(id), plain);
+        this.settings.providers[id].apiKey = '';
+        moved = true;
+      } catch { /* keep the plain-text key and retry next load */ }
+    }
+    if (moved) await this.saveSettings();
+  }
+
+  /** Reads from SecretStorage when available, falling back to data.json. */
+  getApiKey(id: ProviderID): string {
+    const store = secureStore(this.app);
+    if (store) {
+      try {
+        const secret = store.getSecret(secretId(id));
+        if (secret) return secret;
+      } catch { /* fall through to the plain-text value */ }
+    }
+    return this.settings.providers[id].apiKey;
+  }
+
+  async setApiKey(id: ProviderID, key: string): Promise<void> {
+    const store = secureStore(this.app);
+    if (store) {
+      try {
+        store.setSecret(secretId(id), key);
+        this.settings.providers[id].apiKey = '';
+        await this.saveSettings();
+        return;
+      } catch { /* fall through to plain text so the key is not silently lost */ }
+    }
+    this.settings.providers[id].apiKey = key;
+    await this.saveSettings();
   }
 
   async saveSettings() { await this.saveData(this.settings); }

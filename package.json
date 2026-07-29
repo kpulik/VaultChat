@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "node esbuild.config.mjs",
     "build": "tsc --noEmit --skipLibCheck && node esbuild.config.mjs production",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "test": "node esbuild.test.mjs && node --test '.test-build/*.mjs'"
   },
   "devDependencies": {
     "@types/node": "^18",

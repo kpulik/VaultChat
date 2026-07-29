@@ -35,6 +35,13 @@ Commands:
 | `npm run dev` | esbuild in watch mode, rebuilds `main.js` on save |
 | `npm run build` | Type check with `tsc --noEmit`, then a production bundle |
 | `npm run lint` | ESLint with the official `eslint-plugin-obsidianmd` rules |
+| `npm test` | Bundles `tests/` and runs them with node's built-in test runner |
+
+Logic that can be tested without Obsidian lives in `src/core.ts`: the edit and delete
+block parsers, the vault path guard, base URL and host normalisation, and SSE line
+parsing. It imports nothing from `obsidian`, and anything needing `normalizePath` takes
+it as an argument, so the tests run in plain node. Put new pure logic there and test it
+rather than burying it in `main.ts`.
 
 To test inside Obsidian, point the plugin folder of a test vault at this repo:
 

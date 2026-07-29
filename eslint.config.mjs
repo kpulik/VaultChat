@@ -3,7 +3,7 @@ import { defineConfig } from "eslint/config";
 import obsidianmd from "eslint-plugin-obsidianmd";
 
 export default defineConfig([
-  { ignores: ["main.js"] },
+  { ignores: ["main.js", ".test-build/**"] },
   ...obsidianmd.configs.recommended,
   {
     files: ["**/*.ts"],
@@ -13,6 +13,13 @@ export default defineConfig([
     },
     rules: {
       "@typescript-eslint/unbound-method": "off",
+    },
+  },
+  {
+    // node:test's test() returns a promise that is not meant to be awaited.
+    files: ["tests/**/*.ts"],
+    rules: {
+      "@typescript-eslint/no-floating-promises": "off",
     },
   },
 ]);

@@ -76,6 +76,34 @@ export function parseDeleteBlocks(text: string, normalize: Normalizer): DeleteBl
   return blocks;
 }
 
+export type ApplyResult =
+  | { status: 'applied';   content: string }
+  | { status: 'not_found' }
+  | { status: 'ambiguous'; count: number };
+
+export function countOccurrences(haystack: string, needle: string): number {
+  if (needle === '') return 0;
+  let n = 0;
+  for (let i = haystack.indexOf(needle); i !== -1; i = haystack.indexOf(needle, i + needle.length)) n++;
+  return n;
+}
+
+// Applies one ORIGINAL/MODIFIED pair.
+//
+// Two things this guards that a bare String.replace does not:
+//   - The replacement is passed as a function, so `$&`, `` $` ``, `$'`, `$1` and
+//     `$$` in the model's text stay literal. They are otherwise expanded as
+//     replacement patterns, which silently corrupts any note containing `$` -
+//     and Obsidian writes inline and display maths as `$...$` and `$$...$$`.
+//   - An ORIGINAL that appears more than once is refused rather than applied to
+//     whichever copy happens to come first.
+export function applyEdit(content: string, original: string, replacement: string): ApplyResult {
+  const count = countOccurrences(content, original);
+  if (count === 0) return { status: 'not_found' };
+  if (count > 1) return { status: 'ambiguous', count };
+  return { status: 'applied', content: content.replace(original, () => replacement) };
+}
+
 // Secret ids must be lowercase alphanumeric with optional dashes.
 export function secretId(providerId: string): string {
   return `vaultchat-${providerId}`;

@@ -4,7 +4,11 @@ A local-first AI chat for Obsidian that can actually **edit your vault**.
 
 Point it at Ollama, LM Studio, or any OpenAI-compatible server and the model can read your notes, propose edits as a reviewable diff, create new notes, and delete files behind a double confirmation. Nothing leaves your machine unless you choose a hosted provider.
 
-Most local-model plugins for Obsidian only chat. This one writes.
+Plenty of Obsidian plugins talk to local models, and a couple of the largest can edit your vault too. Three things are different here:
+
+- **Local is the default**, not a provider you go and configure. A fresh install points at `127.0.0.1` and never asks for a key.
+- **Every write stays reviewable.** There is no "accept all future edits" switch to flip, so a proposal can never apply itself.
+- **An ambiguous edit is refused, not guessed.** If the text the model wants to replace appears more than once, nothing is written and it is asked for more context.
 
 Hosted providers are supported too and are entirely optional: Anthropic (Claude), OpenAI, Google Gemini, and OpenRouter.
 

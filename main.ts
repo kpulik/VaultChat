@@ -16,6 +16,7 @@ import {
 } from 'obsidian';
 import {
   apiBasePath,
+  applyEdit,
   parseDeleteBlocks as parseDeleteBlocksCore,
   parseEditBlocks as parseEditBlocksCore,
   resolveHost,
@@ -1094,10 +1095,12 @@ class vaultchatView extends ItemView {
             let content = await this.app.vault.read(abstractFile);
             let applied = 0;
             for (const edit of block.edits) {
-              if (content.includes(edit.original)) {
-                content = content.replace(edit.original, edit.replacement);
-                applied++;
+              const r = applyEdit(content, edit.original, edit.replacement);
+              if (r.status === 'ambiguous') {
+                new Notice(`That text appears ${r.count} times in ${block.filePath}. Nothing was changed; ask for more surrounding context.`);
+                return;
               }
+              if (r.status === 'applied') { content = r.content; applied++; }
             }
             if (applied === 0) {
               new Notice(`Could not find the original text in ${block.filePath}.`);
@@ -1159,11 +1162,18 @@ class vaultchatView extends ItemView {
         let content = originalContent;
         let applied = 0;
 
+        let ambiguous = 0;
         for (const edit of block.edits) {
-          if (content.includes(edit.original)) {
-            content = content.replace(edit.original, edit.replacement);
-            applied++;
-          }
+          const r = applyEdit(content, edit.original, edit.replacement);
+          if (r.status === 'ambiguous') { ambiguous = r.count; break; }
+          if (r.status === 'applied') { content = r.content; applied++; }
+        }
+
+        if (ambiguous > 0) {
+          statusEl.textContent = `✗ text appears ${ambiguous} times, nothing changed`;
+          statusEl.addClass('cs-edit-error');
+          new Notice(`That text appears ${ambiguous} times in ${block.filePath}. Nothing was changed; ask for more surrounding context.`);
+          return;
         }
 
         if (applied === 0) {

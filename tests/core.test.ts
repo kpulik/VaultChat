@@ -2,6 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   apiBasePath,
+  applyEdit,
+  countOccurrences,
   resolveHost,
   isSafeVaultPath,
   parseEditBlocks,
@@ -122,4 +124,44 @@ test('parseSseLine ignores comments, blanks and malformed payloads', () => {
   assert.deepEqual(parseSseLine(''), { done: false });
   assert.deepEqual(parseSseLine('data: {not json'), { done: false });
   assert.deepEqual(parseSseLine('data: {}'), { done: false });
+});
+
+test('applyEdit keeps $ patterns literal instead of expanding them', () => {
+  // A bare String.replace treats these as replacement patterns and silently
+  // corrupts the note. Obsidian writes maths as $...$ and $$...$$.
+  const content = 'alpha BODY omega';
+  const cases: [string, string][] = [
+    ['cost $&x$ here',  'alpha cost $&x$ here omega'],
+    ['a $` b',          'alpha a $` b omega'],
+    ["a $' b",          "alpha a $' b omega"],
+    ['a $1 b',          'alpha a $1 b omega'],
+    ['price $$100',     'alpha price $$100 omega'],
+    ['$$E = mc^2$$',    'alpha $$E = mc^2$$ omega'],
+  ];
+  for (const [replacement, expected] of cases) {
+    const r = applyEdit(content, 'BODY', replacement);
+    assert.equal(r.status, 'applied');
+    assert.equal(r.status === 'applied' && r.content, expected, `replacement ${JSON.stringify(replacement)}`);
+  }
+});
+
+test('applyEdit refuses an ORIGINAL that appears more than once', () => {
+  const r = applyEdit('todo\nmiddle\ntodo', 'todo', 'done');
+  assert.deepEqual(r, { status: 'ambiguous', count: 2 });
+});
+
+test('applyEdit reports not_found rather than writing', () => {
+  assert.deepEqual(applyEdit('hello', 'nope', 'x'), { status: 'not_found' });
+  assert.deepEqual(applyEdit('hello', '', 'x'), { status: 'not_found' });
+});
+
+test('applyEdit applies a unique match', () => {
+  const r = applyEdit('one two three', 'two', '2');
+  assert.deepEqual(r, { status: 'applied', content: 'one 2 three' });
+});
+
+test('countOccurrences does not overlap or loop forever', () => {
+  assert.equal(countOccurrences('aaaa', 'aa'), 2);
+  assert.equal(countOccurrences('abc', 'x'), 0);
+  assert.equal(countOccurrences('abc', ''), 0);
 });

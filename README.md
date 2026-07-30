@@ -158,6 +158,10 @@ ln -s /path/to/VaultChat /path/to/vault/.obsidian/plugins/VaultChat
 
 Open Obsidian's developer tools with **Cmd+Option+I** to debug.
 
+## Support
+
+If VaultChat is useful to you, consider [buying me a coffee](https://buymeacoffee.com/kpulik).
+
 ## License
 
 MIT

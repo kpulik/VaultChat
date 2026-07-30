@@ -839,3 +839,12 @@
   font-style: italic;
   padding: 2px 0;
 }
+
+.cs-suggest-added {
+  color: var(--cs-accent);
+}
+
+.cs-suggest-check {
+  margin-left: 6px;
+  font-weight: 700;
+}

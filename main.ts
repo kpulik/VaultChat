@@ -24,6 +24,7 @@ import {
   resolveHost,
   secretId,
 } from './src/core';
+import type { FuzzyMatch, SettingDefinitionItem, SettingGroupItem } from 'obsidian';
 import type { DeleteBlock, EditBlock } from './src/core';
 import * as http from 'http';
 import * as https from 'https';
@@ -213,13 +214,20 @@ interface ChatSession {
 
 // ─── File Suggest Modal ───────────────────────────────────────────────────────
 
+// Multi-select file picker. FuzzySuggestModal normally closes on the first
+// choice; selectSuggestion is overridden so the list stays open and each Enter
+// toggles a note, which is what attaching several notes at once needs. Escape
+// finishes. renderSuggestion adds a checkmark for already-attached notes so the
+// picker itself shows selection state, not just the chip row underneath it.
 class FileSuggestModal extends FuzzySuggestModal<TFile> {
-  private onSelect: (file: TFile) => void;
+  private onToggle: (file: TFile, added: boolean) => void;
+  private attached: Set<string>;
 
-  constructor(app: App, onSelect: (file: TFile) => void) {
+  constructor(app: App, attached: string[], onToggle: (file: TFile, added: boolean) => void) {
     super(app);
-    this.onSelect = onSelect;
-    this.setPlaceholder('Search for a file…');
+    this.attached = new Set(attached);
+    this.onToggle = onToggle;
+    this.setPlaceholder('Search for a note. Enter adds or removes, escape closes.');
   }
 
   getItems(): TFile[] {
@@ -230,9 +238,25 @@ class FileSuggestModal extends FuzzySuggestModal<TFile> {
     return file.path;
   }
 
-  onChooseItem(file: TFile): void {
-    this.onSelect(file);
+  renderSuggestion(match: FuzzyMatch<TFile>, el: HTMLElement): void {
+    super.renderSuggestion(match, el);
+    if (this.attached.has(match.item.path)) {
+      el.addClass('cs-suggest-added');
+      el.createSpan({ cls: 'cs-suggest-check', text: '✓' });
+    }
   }
+
+  selectSuggestion(match: FuzzyMatch<TFile>, _evt: MouseEvent | KeyboardEvent): void {
+    const path  = match.item.path;
+    const added = !this.attached.has(path);
+    if (added) this.attached.add(path); else this.attached.delete(path);
+    this.onToggle(match.item, added);
+    // Re-run the current query so the checkmark updates without closing the modal.
+    this.inputEl.dispatchEvent(new Event('input'));
+  }
+
+  // Selection is handled in selectSuggestion so the modal can stay open.
+  onChooseItem(): void { /* intentionally empty */ }
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -685,11 +709,13 @@ class vaultchatView extends ItemView {
     ctxRow.createEl('button', {
       cls: 'cs-add-file-btn', text: '+', attr: { title: 'Add file to context' },
     }).addEventListener('click', () => {
-      new FileSuggestModal(this.app, (file: TFile) => {
-        if (!this.contextFiles.includes(file.path)) {
-          this.contextFiles.push(file.path);
-          this.renderContextChips();
+      new FileSuggestModal(this.app, this.contextFiles, (file: TFile, added: boolean) => {
+        if (added) {
+          if (!this.contextFiles.includes(file.path)) this.contextFiles.push(file.path);
+        } else {
+          this.contextFiles = this.contextFiles.filter(p => p !== file.path);
         }
+        this.renderContextChips();
       }).open();
     });
 
@@ -1516,95 +1542,177 @@ class vaultchatSettingsTab extends PluginSettingTab {
     this.plugin = plugin;
   }
 
+  // display() and getSettingDefinitions() both drive the same row builders below,
+  // so the imperative tab an older app renders and the declarative definitions
+  // Obsidian 1.13 indexes for search can never describe different settings.
   display(): void {
     const { containerEl } = this;
     containerEl.empty();
 
     for (const [pid, def] of Object.entries(PROVIDERS) as [ProviderID, ProviderDef][]) {
-      const ps = this.plugin.settings.providers[pid];
       new Setting(containerEl).setName(def.name).setHeading();
-
-      if (def.apiKeyLabel !== null) {
-        if (this.plugin.getApiKey(pid)) {
-          this.renderSavedKey(containerEl, def.apiKeyLabel, pid);
-        } else {
-          new Setting(containerEl)
-            .setName(def.apiKeyLabel)
-            .setDesc(def.apiKeyRequired
-              ? `Get yours from ${this.keySource(pid)}`
-              : 'Only needed if your server was started with one. Leave blank otherwise.')
-            .addText(t => {
-              t.inputEl.type = 'password';
-              t.setPlaceholder(def.apiKeyPlaceholder).onChange(v => {
-                void this.plugin.setApiKey(pid, v.trim()).then(() => {
-                  if (v.trim()) this.display();
-                });
-              });
-            });
-        }
-      }
-
-      const known = this.fetchedModels[pid] ?? def.models;
-      const modelSetting = new Setting(containerEl)
-        .setName('Model')
-        .setDesc(def.dynamicModels ? 'Or type any model id supported by this provider.' : '')
-        .addDropdown(dd => {
-          for (const m of known) dd.addOption(m.id, m.label);
-          if (ps.model && !known.find(m => m.id === ps.model)) dd.addOption(ps.model, ps.model);
-          dd.setValue(ps.model || (known[0]?.id ?? ''));
-          dd.onChange(v => { ps.model = v; void this.plugin.saveSettings(); });
-        })
-        .addText(t => {
-          if (!def.dynamicModels) { t.inputEl.addClass('cs-hidden'); return; }
-          t.inputEl.addClass('cs-settings-model-input');
-          t.setPlaceholder('Or type model ID…')
-            .onChange(v => {
-              if (v.trim()) { ps.model = v.trim(); void this.plugin.saveSettings(); }
-            });
-        });
-
-      if (def.dynamicModels) {
-        modelSetting.addExtraButton(b => b
-          .setIcon('refresh-cw')
-          .setTooltip('Refresh model list')
-          .onClick(() => { void this.refreshModels(pid); }),
-        );
-      }
-
+      if (def.apiKeyLabel !== null) this.keyRow(new Setting(containerEl), pid, def);
+      this.modelRow(new Setting(containerEl), pid, def);
       if (def.customBaseUrl) {
-        new Setting(containerEl)
-          .setName('Base URL')
-          .setDesc('Address of your local server, including the port.')
-          .addText(t => t
-            .setPlaceholder(def.defaultBaseUrl)
-            .setValue(ps.baseUrl || def.defaultBaseUrl)
-            .onChange(v => { ps.baseUrl = v.trim(); void this.plugin.saveSettings(); }),
-          );
-        new Setting(containerEl)
-          .setName('Context window (num_ctx)')
-          .setDesc('Tokens pre-allocated for context. Leave at 0 to let the server choose. Lower values use less memory. Ignored by servers that do not support this option.')
-          .addText(t => t
-            .setPlaceholder('0')
-            .setValue(String(this.plugin.settings.ollamaNumCtx))
-            .onChange(v => {
-              const n = v.trim() === '' ? 0 : parseInt(v);
-              if (!isNaN(n) && n >= 0) { this.plugin.settings.ollamaNumCtx = n; void this.plugin.saveSettings(); }
-            }),
-          );
+        this.baseUrlRow(new Setting(containerEl), pid, def);
+        this.numCtxRow(new Setting(containerEl));
       }
     }
 
-    new Setting(containerEl)
-      .setName('System prompt')
+    this.systemPromptRow(new Setting(containerEl));
+    this.maxTokensRow(new Setting(containerEl));
+    this.autoApplyRow(new Setting(containerEl));
+  }
+
+  getSettingDefinitions(): SettingDefinitionItem[] {
+    const items: SettingDefinitionItem[] = [];
+
+    for (const [pid, def] of Object.entries(PROVIDERS) as [ProviderID, ProviderDef][]) {
+      const rows: SettingGroupItem[] = [];
+      if (def.apiKeyLabel !== null) {
+        rows.push({
+          name: `${def.name} API key`,
+          aliases: ['api key', 'token', 'secret', 'credential', def.name],
+          render: s => { this.keyRow(s, pid, def); },
+        });
+      }
+      rows.push({
+        name: `${def.name} model`,
+        aliases: ['model', def.name],
+        render: s => { this.modelRow(s, pid, def); },
+      });
+      if (def.customBaseUrl) {
+        rows.push({
+          name: `${def.name} base URL`,
+          aliases: ['base url', 'port', 'endpoint', 'ollama', 'lm studio', 'llama.cpp'],
+          render: s => { this.baseUrlRow(s, pid, def); },
+        });
+        rows.push({
+          name: 'Context window (num_ctx)',
+          aliases: ['num_ctx', 'context window', 'memory'],
+          render: s => { this.numCtxRow(s); },
+        });
+      }
+      items.push({ type: 'group', heading: def.name, items: rows });
+    }
+
+    items.push(
+      {
+        name: 'System prompt',
+        aliases: ['prompt', 'instructions', 'persona'],
+        render: s => { this.systemPromptRow(s); },
+      },
+      {
+        name: 'Max tokens',
+        desc: 'Maximum response length. Leave at 0 to let the model decide. Anthropic requires a value, so 0 sends 4096 there.',
+        aliases: ['max tokens', 'response length', 'limit'],
+        control: { type: 'number', key: 'maxTokens', min: 0, placeholder: '0' },
+      },
+      {
+        name: 'Auto-apply edits',
+        desc: 'When enabled, file edits are applied immediately with confirm/revert buttons. Notes you attach are sent to the model, so a note containing instructions can cause edits you did not ask for. When disabled, you review each edit and click apply.',
+        aliases: ['auto apply', 'confirm', 'revert', 'diff'],
+        control: { type: 'toggle', key: 'autoApplyEdits' },
+      },
+    );
+
+    return items;
+  }
+
+  // ── Row builders, shared by both entry points ─────────────────────────────
+
+  // Rows re-render themselves in place. A full display() rebuild is deprecated in
+  // 1.13, and update() is 1.13-only, so neither is available while this plugin
+  // still supports 1.11.4. Emptying the three elements a Setting exposes and
+  // rebuilding is version independent, and cheaper than rebuilding the whole tab.
+  private resetRow(s: Setting): void {
+    s.nameEl.empty();
+    s.descEl.empty();
+    s.controlEl.empty();
+  }
+
+  private keyRow(s: Setting, pid: ProviderID, def: ProviderDef): void {
+    this.resetRow(s);
+    if (this.plugin.getApiKey(pid)) { this.renderSavedKey(s, pid, def); return; }
+    s.setName(def.apiKeyLabel ?? 'API key')
+      .setDesc(def.apiKeyRequired
+        ? `Get yours from ${this.keySource(pid)}`
+        : 'Only needed if your server was started with one. Leave blank otherwise.')
+      .addText(t => {
+        t.inputEl.type = 'password';
+        t.setPlaceholder(def.apiKeyPlaceholder).onChange(v => {
+          void this.plugin.setApiKey(pid, v.trim()).then(() => {
+            if (v.trim()) this.keyRow(s, pid, def);
+          });
+        });
+      });
+  }
+
+  private modelRow(s: Setting, pid: ProviderID, def: ProviderDef): void {
+    this.resetRow(s);
+    const ps = this.plugin.settings.providers[pid];
+    const known = this.fetchedModels[pid] ?? def.models;
+    s.setName('Model')
+      .setDesc(def.dynamicModels ? 'Or type any model id supported by this provider.' : '')
+      .addDropdown(dd => {
+        for (const m of known) dd.addOption(m.id, m.label);
+        if (ps.model && !known.find(m => m.id === ps.model)) dd.addOption(ps.model, ps.model);
+        dd.setValue(ps.model || (known[0]?.id ?? ''));
+        dd.onChange(v => { ps.model = v; void this.plugin.saveSettings(); });
+      })
+      .addText(t => {
+        if (!def.dynamicModels) { t.inputEl.addClass('cs-hidden'); return; }
+        t.inputEl.addClass('cs-settings-model-input');
+        t.setPlaceholder('Or type model ID…')
+          .onChange(v => {
+            if (v.trim()) { ps.model = v.trim(); void this.plugin.saveSettings(); }
+          });
+      });
+    if (def.dynamicModels) {
+      s.addExtraButton(b => b
+        .setIcon('refresh-cw')
+        .setTooltip('Refresh model list')
+        .onClick(() => { void this.refreshModels(pid, () => { this.modelRow(s, pid, def); }); }),
+      );
+    }
+  }
+
+  private baseUrlRow(s: Setting, pid: ProviderID, def: ProviderDef): void {
+    const ps = this.plugin.settings.providers[pid];
+    s.setName('Base URL')
+      .setDesc('Address of your local server, including the port.')
+      .addText(t => t
+        .setPlaceholder(def.defaultBaseUrl)
+        .setValue(ps.baseUrl || def.defaultBaseUrl)
+        .onChange(v => { ps.baseUrl = v.trim(); void this.plugin.saveSettings(); }),
+      );
+  }
+
+  private numCtxRow(s: Setting): void {
+    s.setName('Context window (num_ctx)')
+      .setDesc('Tokens pre-allocated for context. Leave at 0 to let the server choose. Lower values use less memory. Ignored by servers that do not support this option.')
+      .addText(t => t
+        .setPlaceholder('0')
+        .setValue(String(this.plugin.settings.ollamaNumCtx))
+        .onChange(v => {
+          const n = v.trim() === '' ? 0 : parseInt(v);
+          if (!isNaN(n) && n >= 0) { this.plugin.settings.ollamaNumCtx = n; void this.plugin.saveSettings(); }
+        }),
+      );
+  }
+
+  private systemPromptRow(s: Setting): void {
+    s.setName('System prompt')
       .addTextArea(ta => {
         ta.setValue(this.plugin.settings.systemPrompt)
           .onChange(v => { this.plugin.settings.systemPrompt = v; void this.plugin.saveSettings(); });
         ta.inputEl.rows = 5;
         ta.inputEl.addClass('cs-settings-textarea');
       });
+  }
 
-    new Setting(containerEl)
-      .setName('Max tokens')
+  private maxTokensRow(s: Setting): void {
+    s.setName('Max tokens')
       .setDesc('Maximum response length. Leave at 0 to let the model decide. Anthropic requires a value, so 0 sends 4096 there.')
       .addText(t => t
         .setPlaceholder('0')
@@ -1614,9 +1722,10 @@ class vaultchatSettingsTab extends PluginSettingTab {
           if (!isNaN(n) && n >= 0) { this.plugin.settings.maxTokens = n; void this.plugin.saveSettings(); }
         }),
       );
+  }
 
-    new Setting(containerEl)
-      .setName('Auto-apply edits')
+  private autoApplyRow(s: Setting): void {
+    s.setName('Auto-apply edits')
       .setDesc('When enabled, file edits are applied immediately with confirm/revert buttons. Notes you attach are sent to the model, so a note containing instructions can cause edits you did not ask for. When disabled, you review each edit and click apply.')
       .addToggle(t => t
         .setValue(this.plugin.settings.autoApplyEdits)
@@ -1624,12 +1733,13 @@ class vaultchatSettingsTab extends PluginSettingTab {
       );
   }
 
-  private renderSavedKey(containerEl: HTMLElement, label: string, pid: ProviderID) {
+
+  private renderSavedKey(s: Setting, pid: ProviderID, def: ProviderDef) {
+    const label = def.apiKeyLabel ?? 'API key';
     const key = this.plugin.getApiKey(pid);
     let revealed = false;
     const secure = secureStore(this.app) !== null;
-    const s = new Setting(containerEl)
-      .setName(label)
+    s.setName(label)
       .setDesc(secure ? 'Key saved to Obsidian secret storage.' : 'Key saved.');
     const displayEl = s.controlEl.createEl('code', { cls: 'cs-token-display', text: maskToken(key) });
     s.controlEl.createEl('br');
@@ -1651,16 +1761,16 @@ class vaultchatSettingsTab extends PluginSettingTab {
     });
 
     row.createEl('button', { cls: 'cs-tok-btn', text: 'Replace' })
-      .addEventListener('click', () => { void this.plugin.setApiKey(pid, '').then(() => this.display()); });
+      .addEventListener('click', () => { void this.plugin.setApiKey(pid, '').then(() => { this.keyRow(s, pid, def); }); });
     row.createEl('button', { cls: 'cs-tok-btn cs-tok-btn--danger', text: 'Remove' })
-      .addEventListener('click', () => { void this.plugin.setApiKey(pid, '').then(() => this.display()); });
+      .addEventListener('click', () => { void this.plugin.setApiKey(pid, '').then(() => { this.keyRow(s, pid, def); }); });
   }
 
   // Model lists pulled from a provider on demand, so the settings dropdown can
   // show them the same way the chat header does.
   private fetchedModels: Partial<Record<ProviderID, { id: string; label: string }[]>> = {};
 
-  private async refreshModels(pid: ProviderID): Promise<void> {
+  private async refreshModels(pid: ProviderID, rerender: () => void): Promise<void> {
     const ps = this.plugin.settings.providers[pid];
     try {
       const models = pid === 'local'
@@ -1676,7 +1786,7 @@ class vaultchatSettingsTab extends PluginSettingTab {
         await this.plugin.saveSettings();
       }
       new Notice(`Loaded ${models.length} models.`);
-      this.display();
+      rerender();
     } catch {
       new Notice('Could not load models. Check the base URL and key.');
     }

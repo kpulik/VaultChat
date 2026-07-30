@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   apiBasePath,
   applyEdit,
+  buildFileTreeContext,
   countOccurrences,
   neutralizeExecutableFences,
   resolveHost,
@@ -12,6 +13,7 @@ import {
   secretId,
   parseSseLine,
 } from '../src/core';
+import type { VaultFileRef } from '../src/core';
 
 // Faithful stand-in for Obsidian's normalizePath: backslashes to slashes,
 // collapse repeated slashes, trim surrounding whitespace and slashes.
@@ -198,4 +200,44 @@ test('neutralizeExecutableFences handles tildes, indentation and long fences', (
   assert.ok(neutralizeExecutableFences('~~~dataviewjs\nx\n~~~').startsWith('~~~text'));
   assert.ok(neutralizeExecutableFences('  ```dataviewjs\nx\n  ```').includes('  ```text'));
   assert.ok(neutralizeExecutableFences('````dataviewjs\nx\n````').startsWith('````text'));
+});
+
+const mk = (path: string, mtime: number): VaultFileRef => ({ path, mtime });
+
+test('buildFileTreeContext lists everything when it fits', () => {
+  const out = buildFileTreeContext([mk('b.md', 1), mk('a.md', 2)], 500);
+  assert.ok(out.includes('EXACT paths'));
+  // Sorted for stability, and both present.
+  assert.ok(out.indexOf('a.md') < out.indexOf('b.md'));
+  assert.ok(!out.includes('PARTIAL'));
+});
+
+test('buildFileTreeContext samples by recency, not alphabetically', () => {
+  // 'zzz' is the newest and 'aaa' the oldest. Alphabetical truncation would keep
+  // aaa and drop zzz, which is the bug this replaces.
+  const files = [mk('aaa.md', 1), mk('mmm.md', 2), mk('zzz.md', 3)];
+  const out = buildFileTreeContext(files, 2);
+  assert.ok(out.includes('zzz.md'), 'newest file must survive the sample');
+  assert.ok(out.includes('mmm.md'));
+  assert.ok(!out.includes('aaa.md'), 'oldest file is the one dropped');
+});
+
+test('buildFileTreeContext tells the model the list is partial and gives the total', () => {
+  const files = Array.from({ length: 40 }, (_, i) => mk(`n${i}.md`, i));
+  const out = buildFileTreeContext(files, 10);
+  assert.ok(out.includes('40 files'), 'the true total must be stated');
+  assert.ok(out.includes('PARTIAL'));
+  assert.ok(out.includes('Never guess'));
+});
+
+test('buildFileTreeContext lists every ancestor folder, not just direct parents', () => {
+  const files = Array.from({ length: 5 }, (_, i) => mk(`a/b/c/deep${i}.md`, i));
+  const out = buildFileTreeContext(files, 2);
+  for (const f of ['a', 'a/b', 'a/b/c']) {
+    assert.ok(out.split('\n').includes(f), `folder ${f} must be listed`);
+  }
+});
+
+test('buildFileTreeContext returns nothing for an empty vault', () => {
+  assert.equal(buildFileTreeContext([], 500), '');
 });

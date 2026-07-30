@@ -17,6 +17,7 @@ import {
 import {
   apiBasePath,
   applyEdit,
+  buildFileTreeContext,
   neutralizeExecutableFences,
   parseDeleteBlocks as parseDeleteBlocksCore,
   parseEditBlocks as parseEditBlocksCore,
@@ -30,6 +31,9 @@ import * as https from 'https';
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const VIEW_TYPE_CHAT = 'vaultchat-chat';
+
+// How many vault paths to show the model before switching to a recency sample.
+const FILE_TREE_MAX_FILES = 500;
 
 const EDIT_INSTRUCTIONS = `
 You have FULL ACCESS to the user's Obsidian vault. You CAN create, edit, and delete files directly.
@@ -740,22 +744,12 @@ class vaultchatView extends ItemView {
   }
 
   private rebuildFileTree() {
-    const allFiles = this.app.vault.getFiles()
-      .map(f => f.path)
-      .sort()
-      .filter(p => !p.startsWith(this.app.vault.configDir + '/'));
-    if (allFiles.length <= 500) {
-      this.vaultFileTree = '\n\nThe following files exist in the user\'s vault. Use these EXACT paths for any file operations:\n\n' + allFiles.join('\n');
-    } else {
-      const folders = new Set<string>();
-      for (const p of allFiles) {
-        const dir = p.substring(0, p.lastIndexOf('/'));
-        if (dir) folders.add(dir);
-      }
-      const truncated = allFiles.slice(0, 300);
-      this.vaultFileTree = '\n\nThe user\'s vault has ' + allFiles.length + ' files. Folders:\n' + [...folders].sort().join('\n') + '\n\nFirst 300 files:\n' + truncated.join('\n');
-    }
+    const files = this.app.vault.getFiles()
+      .filter(f => !f.path.startsWith(this.app.vault.configDir + '/'))
+      .map(f => ({ path: f.path, mtime: f.stat.mtime }));
+    this.vaultFileTree = buildFileTreeContext(files, FILE_TREE_MAX_FILES);
   }
+
 
   // ── Context chips ──────────────────────────────────────────────────────────
 

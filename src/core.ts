@@ -143,6 +143,53 @@ export function neutralizeExecutableFences(markdown: string): string {
   );
 }
 
+export interface VaultFileRef {
+  path:  string;
+  mtime: number;
+}
+
+// Describes the vault to the model so it can use real paths.
+//
+// The whole list is sent when it fits. When it does not, the previous behaviour
+// was to send the alphabetically first 300 paths, which is the worst possible
+// selection: on a large vault the model saw every A and no Z, and confabulated
+// the rest. Instead the complete folder list always goes (folders are far fewer
+// than files, and they are what a create needs), the file sample is taken by
+// recency because that is what a user is likely to be talking about, and the
+// prompt says plainly that the list is partial so the model asks instead of
+// guessing.
+export function buildFileTreeContext(files: VaultFileRef[], maxFiles: number): string {
+  if (files.length === 0) return '';
+
+  const paths = files.map(f => f.path).sort();
+  if (files.length <= maxFiles) {
+    return '\n\nThe following files exist in the user\'s vault. Use these EXACT paths for any file operation:\n\n'
+      + paths.join('\n');
+  }
+
+  const folders = new Set<string>();
+  for (const p of paths) {
+    const parts = p.split('/');
+    // Every ancestor, so a nested folder is not invisible just because no file
+    // sits directly in its parent.
+    for (let i = 1; i < parts.length; i++) folders.add(parts.slice(0, i).join('/'));
+  }
+
+  const recent = [...files]
+    .sort((a, b) => b.mtime - a.mtime)
+    .slice(0, maxFiles)
+    .map(f => f.path)
+    .sort();
+
+  return '\n\nThe user\'s vault has ' + files.length + ' files in these folders:\n'
+    + [...folders].sort().join('\n')
+    + '\n\nThe ' + recent.length + ' most recently edited files, of ' + files.length + ' total:\n'
+    + recent.join('\n')
+    + '\n\nThis file list is PARTIAL. Use a path exactly as written above, or a new path '
+    + 'inside one of the folders above. Never guess at the path of a file you cannot see; '
+    + 'ask the user to attach it instead.';
+}
+
 // Secret ids must be lowercase alphanumeric with optional dashes.
 export function secretId(providerId: string): string {
   return `vaultchat-${providerId}`;

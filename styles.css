@@ -26,6 +26,12 @@
   flex-direction: column;
   height: 100%;
   background: var(--background-primary);
+
+  /* Sized against the pane, not the window: this view lives in a sidebar the
+     user can drag to any width, and a media query would still be reading the
+     whole Obsidian window. */
+  container-type: inline-size;
+  container-name: vaultchat;
 }
 
 /* ── Header ─────────────────────────────────────────────────────────────── */
@@ -33,6 +39,7 @@
 .cs-header {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 6px;
   padding: 10px 14px;
   border-bottom: 1px solid var(--background-modifier-border);
@@ -63,7 +70,16 @@
 .cs-controls {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 6px;
+  /* Without this a flex item refuses to shrink below its content width, which
+     is what pushed the icon buttons off the edge of a narrow pane. */
+  min-width: 0;
+}
+
+.cs-controls > select {
+  min-width: 92px;
 }
 
 .cs-model-select {
@@ -75,6 +91,9 @@
   padding: 3px 6px;
   cursor: pointer;
   max-width: 130px;
+  min-width: 0;
+  flex: 0 1 auto;
+  text-overflow: ellipsis;
 }
 
 .cs-icon-btn {
@@ -87,6 +106,8 @@
   border-radius: 4px;
   line-height: 1;
   transition: color 120ms, background 120ms;
+  flex-shrink: 0;
+  min-width: 26px;
 }
 .cs-icon-btn:hover {
   color: var(--text-normal);
@@ -239,7 +260,15 @@
 .cs-ctx-row {
   display: flex;
   align-items: center;
-  gap: 7px;
+  flex-wrap: wrap;
+  gap: 7px 6px;
+}
+.cs-ctx-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+  flex: 0 0 auto;
 }
 .cs-ctx-check {
   accent-color: var(--cs-accent);
@@ -343,6 +372,38 @@
   padding: 3px 6px;
   cursor: pointer;
   max-width: 130px;
+  min-width: 0;
+  flex: 0 1 auto;
+  text-overflow: ellipsis;
+}
+
+/* Which saved OpenAI-compatible server the local provider points at. */
+.cs-preset-select {
+  font-size: 11px;
+  background: var(--background-modifier-form-field);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 4px;
+  color: var(--text-muted);
+  padding: 3px 6px;
+  cursor: pointer;
+  max-width: 110px;
+  min-width: 0;
+  flex: 0 1 auto;
+  text-overflow: ellipsis;
+}
+
+.cs-endpoint-select {
+  font-size: 11px;
+  background: var(--background-modifier-form-field);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 4px;
+  color: var(--text-muted);
+  padding: 3px 6px;
+  cursor: pointer;
+  max-width: 130px;
+  min-width: 0;
+  flex: 0 1 auto;
+  text-overflow: ellipsis;
 }
 
 .cs-model-wrap {
@@ -457,6 +518,38 @@
   line-height: 1.4;
 }
 
+.cs-history-top {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.cs-history-top .cs-new-chat-btn {
+  flex: 1 1 auto;
+  margin-bottom: 0;
+}
+.cs-history-import-btn {
+  flex: 0 0 auto;
+  padding: 4px 8px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.cs-history-import-btn:hover {
+  color: var(--cs-accent);
+  border-color: var(--cs-accent-dim);
+}
+.cs-history-sort {
+  flex: 0 1 7rem;
+  min-width: 0;
+}
+.cs-import-file-kind {
+  float: right;
+  color: var(--text-faint);
+  font-size: 10px;
+}
+
 .cs-session-meta {
   display: flex;
   gap: 6px;
@@ -535,6 +628,22 @@
   line-height: 1.5;
 }
 
+.cs-presets {
+  margin-bottom: 18px;
+}
+
+.cs-preset-block {
+  margin: 10px 0 16px;
+  padding: 8px 12px;
+  border-left: 2px solid var(--background-modifier-border);
+  background: var(--background-secondary);
+}
+
+.cs-preset-block .setting-item {
+  border-top: 0;
+  padding: 8px 0;
+}
+
 .cs-token-display {
   display: block;
   font-family: var(--font-mono);
@@ -579,7 +688,8 @@
 .cs-add-file-btn {
   font-size: 14px;
   font-weight: 700;
-  width: 26px;
+  width: auto;
+  min-width: 44px;
   height: 26px;
   border-radius: 6px;
   border: 1px dashed var(--background-modifier-border);
@@ -589,6 +699,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 0 7px;
+  white-space: nowrap;
   flex-shrink: 0;
   transition: color 120ms, border-color 120ms, background 120ms;
 }
@@ -821,6 +933,481 @@
   color: oklch(75% 0.12 25);
 }
 
+/* ── Endpoint profiles (settings) ───────────────────────────────────────── */
+
+/* Each saved server is boxed so its name, URL, key and model read as one unit
+   rather than as four unrelated rows in a long settings column. */
+.cs-endpoint-block {
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  padding: 0 12px;
+  margin-bottom: 12px;
+  background: var(--background-secondary);
+}
+
+.cs-endpoints-empty {
+  font-size: 12px;
+  color: var(--text-muted);
+  padding: 8px 0 12px;
+}
+
+.cs-endpoint-status {
+  font-size: 11px;
+  font-family: var(--font-monospace);
+  color: var(--text-muted);
+  padding: 0 0 10px;
+}
+
+/* ── Branching ──────────────────────────────────────────────────────────── */
+
+/* The "2/3" stepper. Only rendered where an alternative actually exists, so it
+   never implies a branch the conversation does not have. */
+.cs-branch-nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-right: 6px;
+}
+
+.cs-branch-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0 3px;
+  font-size: 12px;
+  line-height: 1;
+  border-radius: 3px;
+}
+.cs-branch-btn:hover:not(:disabled) {
+  color: var(--cs-accent);
+  background: var(--background-modifier-hover);
+}
+.cs-branch-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.cs-branch-count {
+  font-family: var(--font-monospace);
+  font-size: 10px;
+  color: var(--text-faint);
+  min-width: 22px;
+  text-align: center;
+}
+
+/* Inline editor for a user message. */
+.cs-edit-input {
+  width: 100%;
+  resize: vertical;
+  font-family: var(--font-text);
+  font-size: 13px;
+  background: var(--background-modifier-form-field);
+  border: 1px solid var(--cs-accent-dim);
+  border-radius: 4px;
+  color: var(--text-normal);
+  padding: 6px 8px;
+}
+
+/* ── Context summary + inspector ────────────────────────────────────────── */
+
+/* One line saying what this chat can actually see. Counts come from resolving
+   the sources, not from counting chips: one folder chip can be forty notes. */
+.cs-ctx-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  font-family: var(--font-monospace);
+  color: var(--text-muted);
+  padding: 2px 0 4px;
+  cursor: pointer;
+}
+.cs-ctx-summary:hover {
+  color: var(--text-normal);
+}
+
+.cs-ctx-inspect {
+  color: var(--cs-accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* Something did not fit, so the line stops being neutral. */
+.cs-ctx-over {
+  color: var(--text-warning);
+}
+
+.cs-inspect-total {
+  font-family: var(--font-monospace);
+  font-size: 12px;
+  color: var(--text-muted);
+  padding-bottom: 10px;
+}
+
+.cs-inspect-heading {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-faint);
+  padding: 14px 0 6px;
+}
+
+.cs-inspect-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 10px;
+  align-items: baseline;
+  padding: 3px 0;
+  border-bottom: 1px solid var(--background-modifier-border);
+  font-size: 12px;
+}
+
+.cs-inspect-path {
+  font-family: var(--font-monospace);
+  overflow-wrap: anywhere;
+}
+
+.cs-inspect-why {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.cs-inspect-size {
+  color: var(--text-faint);
+  font-family: var(--font-monospace);
+  font-size: 11px;
+}
+
+.cs-inspect-row--skipped .cs-inspect-path {
+  color: var(--text-faint);
+  text-decoration: line-through;
+}
+
+/* ── Vault search ───────────────────────────────────────────────────────── */
+
+/* Each result shows why it matched. That is not decoration: it is how a user
+   tells an alias hit from a filename hit, and so whether the top result is the
+   note they actually meant. */
+.cs-search-path {
+  font-family: var(--font-monospace);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.cs-search-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 11px;
+  color: var(--text-muted);
+  padding-top: 2px;
+}
+
+.cs-search-score {
+  font-family: var(--font-monospace);
+  color: var(--text-faint);
+}
+
+/* ── Narrow panes ───────────────────────────────────────────────────────── */
+
+/* The chat is usually docked in a sidebar that can be dragged very narrow.
+   Everything above wraps; these thresholds drop what stops being useful. */
+@container vaultchat (max-width: 520px) {
+  .cs-header {
+    padding: 8px 10px;
+  }
+  /* The wordmark is the first thing worth losing: the icon still identifies
+     the pane, and the controls are what the user actually needs to reach. */
+  .cs-title {
+    display: none;
+  }
+  .cs-controls {
+    flex: 1 1 100%;
+    justify-content: flex-start;
+  }
+  .cs-footer {
+    padding: 8px 10px 10px;
+  }
+}
+
+@container vaultchat (max-width: 300px) {
+  /* Below this, side-by-side selects are unreadable stubs, so each gets a row. */
+  .cs-controls > select {
+    min-width: 0;
+  }
+  .cs-preset-select,
+  .cs-provider-select,
+  .cs-endpoint-select,
+  .cs-model-select {
+    flex: 1 1 100%;
+    max-width: none;
+    min-width: 0;
+  }
+  .cs-msg--user .cs-msg-body {
+    max-width: 100%;
+  }
+  .cs-inspect-row {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+}
+
+/* Chain of thought shown because it was the entire output. */
+.cs-reasoning-only {
+  margin-top: 8px;
+  padding: 8px 10px;
+  border-left: 2px solid var(--background-modifier-border);
+  color: var(--text-muted);
+  font-size: 12px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* ── Agent tool turns ───────────────────────────────────────────────────── */
+
+.cs-tool-status {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-style: italic;
+  padding: 2px 0;
+}
+
+/* Shown because hiding what the agent read would make its answers
+   unauditable; collapsed because it is machinery, not conversation. */
+.cs-tool-turn {
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  background: var(--background-secondary);
+  padding: 6px 10px;
+  font-size: 12px;
+}
+
+.cs-tool-turn summary {
+  cursor: pointer;
+  color: var(--text-muted);
+  font-family: var(--font-monospace);
+  font-size: 11px;
+  user-select: none;
+}
+
+.cs-tool-turn pre {
+  margin: 8px 0 2px;
+  max-height: 320px;
+  overflow: auto;
+  font-size: 11px;
+}
+
+/* ── Plan preview and receipts ──────────────────────────────────────────── */
+
+.cs-plan-risk {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 3px 8px;
+  border-radius: 4px;
+  margin-bottom: 10px;
+}
+.cs-plan-risk--low      { background: var(--background-modifier-border); color: var(--text-muted); }
+.cs-plan-risk--moderate { background: var(--cs-accent-dim); color: var(--text-on-accent); }
+.cs-plan-risk--high     { background: var(--text-error); color: var(--text-on-accent); }
+
+.cs-plan-desc {
+  font-size: 12px;
+  color: var(--text-muted);
+  padding-bottom: 10px;
+}
+
+.cs-plan-preview {
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  padding: 10px 12px;
+  max-height: 340px;
+  overflow: auto;
+  font-size: 12px;
+}
+
+.cs-plan-summary {
+  font-size: 11px;
+  font-family: var(--font-monospace);
+  color: var(--text-muted);
+  padding: 8px 0;
+}
+
+.cs-plan-blocked {
+  border-left: 2px solid var(--text-warning);
+  padding: 6px 10px;
+  margin-bottom: 10px;
+  background: var(--background-secondary);
+}
+.cs-plan-blocked-head {
+  font-size: 12px;
+  color: var(--text-warning);
+  font-weight: 600;
+}
+.cs-plan-blocked-row {
+  font-size: 11px;
+  font-family: var(--font-monospace);
+  color: var(--text-muted);
+}
+
+.cs-plan-empty {
+  font-size: 12px;
+  color: var(--text-muted);
+  padding: 10px 0;
+}
+
+.cs-plan-buttons {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  padding-top: 14px;
+}
+
+/* Armed: the second click is the one that applies a destructive plan. */
+.cs-plan-armed.cs-plan-armed {
+  background: var(--text-error);
+  color: var(--text-on-accent);
+}
+
+.cs-plan-receipt {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: var(--text-muted);
+  border-left: 2px solid var(--cs-accent);
+  padding: 4px 10px;
+}
+
+.cs-plan-noundo {
+  font-size: 11px;
+  color: var(--text-faint);
+  font-style: italic;
+}
+
+/* ── Activity log ───────────────────────────────────────────────────────── */
+
+.cs-activity-empty {
+  font-size: 12px;
+  color: var(--text-muted);
+  padding: 10px 0;
+}
+
+.cs-activity-row {
+  border-bottom: 1px solid var(--background-modifier-border);
+  padding: 8px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  align-items: flex-start;
+}
+.cs-activity-row--undone {
+  opacity: 0.55;
+}
+
+.cs-activity-head {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  flex-wrap: wrap;
+}
+
+.cs-activity-time {
+  font-family: var(--font-monospace);
+  font-size: 11px;
+  color: var(--text-faint);
+  flex-shrink: 0;
+}
+
+.cs-activity-desc {
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.cs-activity-meta {
+  font-size: 11px;
+  font-family: var(--font-monospace);
+  color: var(--text-muted);
+}
+
+.cs-activity-note {
+  font-size: 11px;
+  color: var(--text-faint);
+  font-style: italic;
+}
+
+/* ── Chat sidebar controls ──────────────────────────────────────────────── */
+
+.cs-history-search {
+  width: 100%;
+  font-size: 12px;
+  padding: 5px 8px;
+  margin-bottom: 8px;
+  border-radius: 6px;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-modifier-form-field);
+  color: var(--text-normal);
+  outline: none;
+}
+.cs-history-search:focus {
+  border-color: var(--cs-accent-dim);
+}
+
+/* Row actions stay out of the way until the row is hovered, so a dense list
+   reads as titles rather than as a wall of buttons. */
+.cs-session-actions {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  opacity: 0;
+  transition: opacity 120ms;
+  flex-shrink: 0;
+}
+.cs-session-item:hover .cs-session-actions,
+.cs-session-item:focus-within .cs-session-actions {
+  opacity: 1;
+}
+
+.cs-session-act {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-faint);
+  font-size: 12px;
+  line-height: 1;
+  padding: 3px 4px;
+  border-radius: 3px;
+}
+.cs-session-act:hover {
+  color: var(--cs-accent);
+  background: var(--background-modifier-hover);
+}
+
+/* A pinned chat keeps its star visible, because that is its state and not an
+   action waiting to be discovered. */
+.cs-session-item .cs-session-act:first-child {
+  opacity: 1;
+}
+
+.cs-rename-input {
+  width: 100%;
+  font-size: 13px;
+  padding: 7px 9px;
+  border-radius: 6px;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-modifier-form-field);
+  color: var(--text-normal);
+  outline: none;
+}
+.cs-rename-input:focus {
+  border-color: var(--cs-accent-dim);
+}
+
 /* ── State utilities (must stay last) ───────────────────────────────────── */
 /* The class is repeated to raise specificity above the single-class component
    rules above; being last in the file settles ties such as .cs-icon-btn:hover. */
@@ -831,6 +1418,13 @@
 
 .cs-accent-active.cs-accent-active {
   color: var(--cs-accent);
+}
+
+/* A delete button that has been pressed once and is waiting for the second. */
+.cs-confirming.cs-confirming {
+  color: var(--text-on-accent);
+  background: var(--text-error);
+  opacity: 1;
 }
 
 .cs-thinking {

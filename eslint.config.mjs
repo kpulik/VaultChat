@@ -20,6 +20,10 @@ export default defineConfig([
     files: ["tests/**/*.ts"],
     rules: {
       "@typescript-eslint/no-floating-promises": "off",
+      // Path-handling tests use literal config-folder names as fixtures on
+      // purpose: one of them asserts that ".obsidian" is NOT special-cased, so
+      // the real Vault#configDir would defeat the test.
+      "obsidianmd/hardcoded-config-path": "off",
     },
   },
 ]);

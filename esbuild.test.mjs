@@ -3,7 +3,21 @@
 import esbuild from 'esbuild';
 
 await esbuild.build({
-  entryPoints: ['tests/core.test.ts'],
+  entryPoints: [
+    'tests/core.test.ts',
+    'tests/endpoints.test.ts',
+    'tests/messageTree.test.ts',
+    'tests/context.test.ts',
+    'tests/vault.test.ts',
+    'tests/links.test.ts',
+    'tests/diagnose.test.ts',
+    'tests/agent.test.ts',
+    'tests/plan.test.ts',
+    'tests/analysis.test.ts',
+    'tests/presets.test.ts',
+    'tests/import.test.ts',
+    'tests/settings.test.ts',
+  ],
   bundle: true,
   platform: 'node',
   format: 'esm',
